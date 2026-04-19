@@ -1744,9 +1744,9 @@ function updateBlackholes(dt){
   }
   suckingObjects = suckingObjects.filter(s => s.scale > 0);
 
-  // ブラックホールが1つ以上生きていればループ音ON、なければOFF
+  // ブラックホールが1つ以上生きていて、かつplaying中のみループ音ON
   const bhAlive = blackholes.some(bh => bh.alive);
-  if (bhAlive) {
+  if (bhAlive && state === 'playing') {
     startBlackholeLoopSound();
   } else {
     stopBlackholeLoopSound();
@@ -3220,8 +3220,8 @@ function updateUfos(dt){
 
   ufos = ufos.filter(u => u.y > -200 && u.x > -150 && u.x < W + 150);
 
-  // UFOが1機以上画面内にいればループ音ON、いなければOFF
-  if (ufos.length > 0) {
+  // UFOが1機以上画面内にいて、かつplaying中のみループ音ON
+  if (ufos.length > 0 && state === 'playing') {
     startUfoLoopSound();
   } else {
     stopUfoLoopSound();
@@ -4295,8 +4295,9 @@ cv.addEventListener('touchstart',e=>{
     return;
   }
 
-  // スタート画面・ミッションクリア画面・全クリア画面では星以外のタッチを無視
-  if(state === 'start' || state === 'stage_clear' || state === 'all_clear') return;
+  // スタート画面・ミッションクリア画面・全クリア画面・ゲームオーバー画面では星以外のタッチを無視
+  // ゲームオーバー時は「再挑戦する」ボタンのみ有効
+  if(state === 'start' || state === 'stage_clear' || state === 'all_clear' || state === 'over') return;
 
   handleStart();
 },{passive:false});
@@ -4356,10 +4357,8 @@ cv.addEventListener('click', (e) => {
   // (「ミッションへ出発」ボタンの操作を優先させるため)
   if (state === 'stage_clear' || state === 'all_clear') return;
 
-  // ゲームオーバー時のみ、星以外のクリックで再挑戦
-  if (state === 'over') {
-    handleStart();
-  }
+  // ゲームオーバー時は星以外のクリックを無視（「再挑戦する」ボタンのみ有効）
+  if (state === 'over') return;
 });
 
 // ==========================================

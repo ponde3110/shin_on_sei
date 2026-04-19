@@ -7,7 +7,14 @@
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
 
 html, body {
   width: 100%;
@@ -15,6 +22,7 @@ html, body {
   background: #000008;
   overflow: hidden;
   font-family: var(--font-sans, -apple-system, sans-serif);
+  -webkit-touch-callout: none;
 }
 
 /* ゲーム全体のラッパー：画面中央に縦長キャンバスを配置 */
@@ -657,7 +665,6 @@ const STAGES=[
 // ===== 心音ブロック定義 =====
 const BLOCK_TYPES = [
   { labels:["正常","心不全"], correct:"正常", comment:"ギャロップの有無を確認", sound:"apex.mp3", mission:1 },
-  { labels:["正常","心不全"], correct:"正常", comment:"ギャロップの有無を確認", sound:"base.mp3", mission:1 },
   { labels:["正常","心不全"], correct:"心不全", comment:"ギャロップの有無を確認",   sound:"gallop.mp3", mission:1 },
   { labels:["大動脈弁狭窄","僧帽弁逆流"], correct:"大動脈弁狭窄", comment:"Ⅱ音の有無に注目", sound:"SEM.mp3",    mission:2 },
   { labels:["大動脈弁狭窄","僧帽弁逆流"], correct:"僧帽弁逆流", comment:"Ⅱ音の有無に注目",   sound:"HSM.mp3",    mission:2 },
@@ -667,8 +674,8 @@ const BLOCK_TYPES = [
   { labels:["僧帽弁逆流","僧帽弁逸脱"],  correct:"僧帽弁逸脱", comment:"Ⅰ音の有無に注目", sound:"LSM.mp3", mission:4 },
   { labels:["拡張型心筋症","肥大型心筋症"], correct:"肥大型心筋症",　comment:"Ⅲ音とⅣ音に注目", sound:"S4.mp3", mission:5 },
   { labels:["拡張型心筋症","肥大型心筋症"], correct:"拡張型心筋症",　comment:"Ⅲ音とⅣ音に注目", sound:"S3.mp3", mission:5 },
-  { labels:["心膜炎","肺高血圧"], correct:"心膜炎", comment:"独特な音感をを認識", sound:"rub.mp3", mission:6 },
-  { labels:["心膜炎","肺高血圧"], correct:"肺高血圧", comment:"独特な音感を認識", sound:"2P.mp3",  mission:6 },
+  { labels:["心膜炎","肺高血圧"], correct:"心膜炎", comment:"特徴的な音を認識", sound:"rub.mp3", mission:6 },
+  { labels:["心膜炎","肺高血圧"], correct:"肺高血圧", comment:"特徴的な音を認識", sound:"2P.mp3",  mission:6 },
 ];
 
 // 現在のハートセットに割り当てられたブロック情報
@@ -699,21 +706,32 @@ function unlockAudio() {
   silentAudio.volume = 0;
   silentAudio.play().catch(() => {});
   // 心音BGMが止まっていたら再開
-  if (currentBgm && currentBgm.paused && currentBgmFile) {
-    currentBgm.play().catch(() => {});
+  if (currentBgmFile) {
+    if (_isIOS && !_bgmSourceNode) {
+      _playBgmWebAudio(currentBgmFile);
+    } else if (!_isIOS && currentBgm && currentBgm.paused) {
+      currentBgm.play().catch(() => {});
+    }
   }
 }
 
-// ===== BGM / 心音管理 =====
-let currentBgm = null;        // 現在再生中のBGM (Audio)
-let currentBgmFile = null;    // 現在再生中のファイル名
-let heartSoundAudio = null;   // 心音SE (Audio)
+// ===== BGM / 心音管理（HTMLAudio主体 + WebAudio iOS フォールバック）=====
+let currentBgm = null;          // 再生中の HTMLAudioElement（Android/PC）
+let currentBgmFile = null;      // 再生中のファイル名
+let heartSoundAudio = null;     // 後方互換ダミー
+
+// Web Audio API経由のBGM（iOS Safari 用フォールバック）
+let _bgmSourceNode = null;
+let _bgmGainNode   = null;
+let _bgmBufferCache = {};
+
+// iOSかどうかを判定
+const _isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 // ステージ番号(1-7)に対応するmissionのブロックをランダム取得
 function getBlockForStage(stageId) {
   let pool;
   if (stageId === 7) {
-    // 最終ステージ: mission 1-6 からランダム
     pool = BLOCK_TYPES.filter(b => b.mission >= 1 && b.mission <= 6);
   } else {
     pool = BLOCK_TYPES.filter(b => b.mission === stageId);
@@ -722,15 +740,82 @@ function getBlockForStage(stageId) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-// BGMを再生（同じファイルなら継続、変わる場合は切り替え）
+// ── iOS用: Web Audio API でBGMを再生 ──
+function _playBgmWebAudio(soundFile) {
+  // 既に同じファイルが再生中なら何もしない
+  if (currentBgmFile === soundFile && _bgmSourceNode) return;
+  _stopBgmWebAudio();
+  currentBgmFile = soundFile;
+
+  const ac = getAC();
+  const doLoad = () => {
+    if (_bgmBufferCache[soundFile]) {
+      _startBgmNode(_bgmBufferCache[soundFile], soundFile);
+      return;
+    }
+    fetch('sound/' + soundFile)
+      .then(r => r.arrayBuffer())
+      .then(ab => {
+        // decodeAudioData: コールバック形式とPromise形式の両方に対応
+        const onSuccess = (buf) => {
+          _bgmBufferCache[soundFile] = buf;
+          _startBgmNode(buf, soundFile);
+        };
+        const result = ac.decodeAudioData(ab, onSuccess, () => {});
+        // Promise形式もサポートする環境ではthenを使う
+        if (result && typeof result.then === 'function') {
+          result.then(onSuccess).catch(() => {});
+        }
+      })
+      .catch(() => {});
+  };
+
+  if (ac.state === 'suspended') {
+    ac.resume().then(doLoad).catch(doLoad);
+  } else {
+    doLoad();
+  }
+}
+
+function _startBgmNode(buf, soundFile) {
+  if (currentBgmFile !== soundFile) return; // 途中でstop済み
+  _stopBgmWebAudio();
+  const ac = getAC();
+  _bgmGainNode = ac.createGain();
+  _bgmGainNode.gain.value = 0.55;
+  _bgmGainNode.connect(ac.destination);
+  _bgmSourceNode = ac.createBufferSource();
+  _bgmSourceNode.buffer = buf;
+  _bgmSourceNode.loop = true;
+  _bgmSourceNode.connect(_bgmGainNode);
+  _bgmSourceNode.start(0);
+}
+
+function _stopBgmWebAudio() {
+  if (_bgmSourceNode) {
+    try { _bgmSourceNode.stop(); } catch(e) {}
+    try { _bgmSourceNode.disconnect(); } catch(e) {}
+    _bgmSourceNode = null;
+  }
+  if (_bgmGainNode) {
+    try { _bgmGainNode.disconnect(); } catch(e) {}
+    _bgmGainNode = null;
+  }
+}
+
+// ── メイン: BGM再生（Android/PCはHTMLAudio、iOSはWebAudio）──
 function playBgm(soundFile) {
+  if (_isIOS) {
+    _playBgmWebAudio(soundFile);
+    return;
+  }
+  // Android / PC: HTMLAudio
   if (currentBgmFile === soundFile && currentBgm && !currentBgm.paused) return;
   stopBgm();
   currentBgmFile = soundFile;
   currentBgm = new Audio('sound/' + soundFile);
   currentBgm.loop = true;
   currentBgm.volume = 0.55;
-  // iOSではAudioContextをresumeしてからAudioも再生
   const ac = getAC();
   const doPlay = () => currentBgm.play().catch(() => {});
   if (ac.state === 'suspended') {
@@ -741,11 +826,14 @@ function playBgm(soundFile) {
 }
 
 function stopBgm() {
+  // HTMLAudio停止
   if (currentBgm) {
     currentBgm.pause();
     currentBgm.currentTime = 0;
     currentBgm = null;
   }
+  // WebAudio停止
+  _stopBgmWebAudio();
   currentBgmFile = null;
 }
 
@@ -1165,8 +1253,8 @@ const LIFE_MAX=30; // 後方互換のため残す
 const ENERGY_MAX=100; // エネルギーの最大値
 const ENERGY_MOVE_COST=3; // 移動1秒あたりのエネルギー消費
 const ENERGY_HIT_COST=18;   // 隕石衝突時のエネルギー消費
-const ENERGY_MISS_COST=10;  // 正解ハートを逃した時のエネルギー消費
-const ENERGY_WRONG_COST=35; // 不正解ハート取得時のエネルギー消費
+const ENERGY_MISS_COST=17;  // 正解ハートを逃した時のエネルギー消費
+const ENERGY_WRONG_COST=25; // 不正解ハート取得時のエネルギー消費
 const ENERGY_BH_COST=0;    // ブラックホール接触時のエネルギー消費
 const ENERGY_HEART_GAIN=25; // 正解ハート取得時のエネルギー回復
 const ENERGY_RESCUE_GAIN=50;// 宇宙飛行士救助時のエネルギー回復
@@ -1817,6 +1905,7 @@ let heartSetClearTimer = 0;
 const HEART_SET_WAIT = 2.5;
 let lastMissedAnswer = null;
 let heartSpawnCount = 0; // 現ステージでのハート出現回数 // 正解ハートを逃したときの正解ラベル
+let hintDismissed = false; // 正解ハート取得時にヒントを非表示にするフラグ
 let hudProgress = 0;    // 進捗バー表示用（実際の表示値）
 let hudTarget   = 0;    // 進捗バーの目標値（ハート出現ごとに更新）
 let playingTime = 0;    // playing状態の経過時間（秒）
@@ -1826,6 +1915,7 @@ function spawnHeartSets(){
   heartSetActive = true;
   heartSetClearTimer = 0;
   lastMissedAnswer = null; // 次のハート出現でリセット
+  hintDismissed = false;   // 次のハート出現でヒントを再表示
   heartSpawnCount++;
   // ハート出現のたびに進捗バーの目標値を更新
   { const maxH = st().heartCount || 6;
@@ -2350,7 +2440,7 @@ function drawHUD(){
   ctx.restore();
 
   // ===== ヒントコメント（左下、音出現中に表示） =====
-  if(heartSetActive && currentBlock && currentBlock.comment){
+  if(heartSetActive && currentBlock && currentBlock.comment && !hintDismissed){
     drawHintComment(currentBlock.comment);
   }
 
@@ -2370,10 +2460,14 @@ function drawHintComment(comment){
   const PY = EY - 4;
 
   ctx.save();
+  const labelText = 'ヒント：';
   ctx.font = "bold 9px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
-  const textW = ctx.measureText(comment).width;
-  const PW = textW + 30;
+  const labelW = ctx.measureText(labelText).width;
+  ctx.font = "9px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
+  const textW  = ctx.measureText(comment).width;
+  const PW = labelW + textW + 14;
   const PX = MARGIN;
+  const midY = PY + PH / 2;
 
   // 背景パネル（グラデーション）
   const bg = ctx.createLinearGradient(PX, PY, PX, PY + PH);
@@ -2392,15 +2486,16 @@ function drawHintComment(comment){
   ctx.lineWidth = 0.5;
   ctx.beginPath(); ctx.moveTo(PX+6, PY+1); ctx.lineTo(PX+PW-6, PY+1); ctx.stroke();
 
-  // 💡アイコン
-  ctx.font = "bold 10px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
+  // 「ヒント：」ラベル（明るいシアン・太字）
   ctx.textAlign = 'left';
-  ctx.fillText('💡', PX + 4, PY + PH/2 + 4);
+  ctx.fillStyle = 'rgba(120,220,255,1)';
+  ctx.font = "bold 9px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
+  ctx.fillText(labelText, PX + 6, midY + 3);
 
   // コメントテキスト
-  ctx.font = "bold 9px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
-  ctx.fillStyle = 'rgba(180,230,255,0.95)';
-  ctx.fillText(comment, PX + 18, PY + PH/2 + 3);
+  ctx.fillStyle = 'rgba(210,240,255,0.95)';
+  ctx.font = "9px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
+  ctx.fillText(comment, PX + 6 + labelW, midY + 3);
 
   ctx.restore();
 }
@@ -2415,10 +2510,14 @@ function drawMissedAnswer(label){
   const PY = EY - 4;
 
   ctx.save();
+  const labelText = '正解：';
   ctx.font = "bold 9px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
-  const textW = ctx.measureText(label).width;
-  const PW = textW + 30;
+  const labelW = ctx.measureText(labelText).width;
+  ctx.font = "9px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
+  const textW  = ctx.measureText(label).width;
+  const PW = labelW + textW + 14;
   const PX = MARGIN;
+  const midY = PY + PH / 2;
 
   // 背景パネル（オレンジ系グラデーション・ヒントと区別）
   const bg = ctx.createLinearGradient(PX, PY, PX, PY + PH);
@@ -2437,15 +2536,16 @@ function drawMissedAnswer(label){
   ctx.lineWidth = 0.5;
   ctx.beginPath(); ctx.moveTo(PX+6, PY+1); ctx.lineTo(PX+PW-6, PY+1); ctx.stroke();
 
-  // ✅アイコン
-  ctx.font = "bold 10px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
+  // 「正解：」ラベル（オレンジ・太字）
   ctx.textAlign = 'left';
-  ctx.fillText('✅', PX + 3, PY + PH/2 + 4);
+  ctx.fillStyle = 'rgba(255,180,60,1)';
+  ctx.font = "bold 9px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
+  ctx.fillText(labelText, PX + 6, midY + 3);
 
   // 正解テキスト
-  ctx.font = "bold 9px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
-  ctx.fillStyle = 'rgba(255,200,120,0.95)';
-  ctx.fillText(label, PX + 18, PY + PH/2 + 3);
+  ctx.fillStyle = 'rgba(255,220,160,0.95)';
+  ctx.font = "9px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
+  ctx.fillText(label, PX + 6 + labelW, midY + 3);
 
   ctx.restore();
 }
@@ -3511,7 +3611,7 @@ function checkCollisions(){
       it.alive=false;
       if(it.isHeart){
         stopBgm(); // ハート取得時にBGM即停止
-        if(it.isCorrect){ energy=Math.min(ENERGY_MAX,energy+ENERGY_HEART_GAIN); life=Math.round(energy/ENERGY_MAX*LIFE_MAX); pickupFlash=0.5; playCorrectSE(); }
+        if(it.isCorrect){ energy=Math.min(ENERGY_MAX,energy+ENERGY_HEART_GAIN); life=Math.round(energy/ENERGY_MAX*LIFE_MAX); pickupFlash=0.5; playCorrectSE(); hintDismissed=true; }
         else            { energy=Math.max(0,energy-ENERGY_WRONG_COST); life=Math.round(energy/ENERGY_MAX*LIFE_MAX); hitFlash=0.4; playWrongSE(); }
       } else {
         pickupFlash=0.3;
@@ -4021,7 +4121,7 @@ function startStage(idx){
   rocketX=W/2; rocketVX=0; rocketTilt=0; speed=FIXED_SPEED; dist=0;
   debris=[]; items=[]; particles=[]; ufos=[]; astronauts=[]; blackholes=[]; suckingObjects=[];
   blackholeUsed=false;
-  heartSetActive=false; heartSetClearTimer=0; lastMissedAnswer=null; heartSpawnCount=0; hudProgress=0; hudTarget=0; playingTime=0;
+  heartSetActive=false; heartSetClearTimer=0; lastMissedAnswer=null; hintDismissed=false; heartSpawnCount=0; hudProgress=0; hudTarget=0; playingTime=0;
   spawnTimer=1.5; hitFlash=0; pickupFlash=0; shakeX=0; shakeY=0;
   launchT=0; arriveT=0; bgDestLastR=0; bgDestLastY=0;
   starScroll=0; state='launch_anim';
@@ -4195,8 +4295,8 @@ cv.addEventListener('touchstart',e=>{
     return;
   }
 
-  // ミッションクリア画面では星以外のタッチでリセットしない
-  if(state === 'stage_clear' || state === 'all_clear') return;
+  // スタート画面・ミッションクリア画面・全クリア画面では星以外のタッチを無視
+  if(state === 'start' || state === 'stage_clear' || state === 'all_clear') return;
 
   handleStart();
 },{passive:false});
@@ -4249,13 +4349,15 @@ cv.addEventListener('click', (e) => {
     return;
   }
 
+  // スタート画面では星以外のクリックを無視（ボタン経由のみ有効）
+  if (state === 'start') return;
+
   // ミッションクリア画面のときは、星以外のクリックでリセットされないようにガード
   // (「ミッションへ出発」ボタンの操作を優先させるため)
   if (state === 'stage_clear' || state === 'all_clear') return;
 
-  // どのアイコンも押されていない場合のみ、通常のスタート処理
-  // ただし、最初のスタート画面(start)やゲームオーバー(over)の時のみ動作させる
-  if (state === 'start' || state === 'over') {
+  // ゲームオーバー時のみ、星以外のクリックで再挑戦
+  if (state === 'over') {
     handleStart();
   }
 });
@@ -4487,9 +4589,12 @@ let celebAnimId = null;
 function startCelebBgCanvas() {
   const canvas = document.getElementById('celebBgCanvas');
   const c = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
   const W2 = canvas.offsetWidth || 320;
   const H2 = canvas.offsetHeight || 520;
-  canvas.width = W2; canvas.height = H2;
+  canvas.width = W2 * dpr; canvas.height = H2 * dpr;
+  canvas.style.width = W2 + 'px'; canvas.style.height = H2 + 'px';
+  c.scale(dpr, dpr);
 
   // 背景星
   const stars = Array.from({length:160},()=>({
@@ -4631,22 +4736,26 @@ updateBtn = function() {
 // ===== 裏タブ時の音声停止／復帰 =====
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
-    // BGM（Audioオブジェクト）を一時停止
+    // HTMLAudio BGMを一時停止（Android/PC）
     if (currentBgm && !currentBgm.paused) {
       currentBgm.pause();
     }
-    // Web Audio API（UFO・ブラックホールループ）をサスペンド
+    // Web Audio API をサスペンド（iOS BGM・SE・ループ音）
     if (_audioCtx && _audioCtx.state === 'running') {
       _audioCtx.suspend().catch(() => {});
     }
   } else {
-    // 表タブに戻ったらBGMを再開
-    if (currentBgm && currentBgm.paused && currentBgmFile) {
+    // HTMLAudio BGMを再開（Android/PC）
+    if (!_isIOS && currentBgm && currentBgm.paused && currentBgmFile) {
       currentBgm.play().catch(() => {});
     }
-    // Web Audio APIを再開
+    // Web Audio API を再開（iOS）
     if (_audioCtx && _audioCtx.state === 'suspended') {
-      _audioCtx.resume().catch(() => {});
+      _audioCtx.resume().then(() => {
+        if (_isIOS && currentBgmFile && !_bgmSourceNode) {
+          _playBgmWebAudio(currentBgmFile);
+        }
+      }).catch(() => {});
     }
   }
 });

@@ -574,26 +574,31 @@ function makeSaturnImg(img, diameter) {
 let earthCanvas=null, moonCanvas=null, marsCanvas=null, jupiterCanvas=null, 
     saturnCanvas=null, uranusCanvas=null, neptuneCanvas=null, goalCanvas=null;
 
+// HUD専用の高解像度アイコンキャッシュ（直径80px：DPR=3でも十分な品質）
+const HUD_ICON_D = 80;
+let hudEarthCanvas=null, hudMoonCanvas=null, hudMarsCanvas=null, hudJupiterCanvas=null,
+    hudSaturnCanvas=null, hudUranusCanvas=null, hudNeptuneCanvas=null, hudGoalCanvas=null;
+
 // 画像が読み込まれたらCanvasを生成
-earthImg.onload   = () => { earthCanvas   = makeRoundImg(earthImg, 400); };
-moonImg.onload    = () => { moonCanvas    = makeRoundImg(moonImg, 400); };
-marsImg.onload    = () => { marsCanvas    = makeRoundImg(marsImg, 400); };
-jupiterImg.onload = () => { jupiterCanvas = makeRoundImg(jupiterImg, 400); };
-saturnImg.onload  = () => { saturnCanvas  = makeSaturnImg(saturnImg, 400); };
-uranusImg.onload  = () => { uranusCanvas  = makeRoundImg(uranusImg, 400); };
-neptuneImg.onload = () => { neptuneCanvas = makeRoundImg(neptuneImg, 400); };
-goalImg.onload    = () => { goalCanvas    = makeRoundImg(goalImg, 400); };
+earthImg.onload   = () => { earthCanvas   = makeRoundImg(earthImg, 400);   hudEarthCanvas   = makeRoundImg(earthImg, HUD_ICON_D); };
+moonImg.onload    = () => { moonCanvas    = makeRoundImg(moonImg, 400);     hudMoonCanvas    = makeRoundImg(moonImg, HUD_ICON_D); };
+marsImg.onload    = () => { marsCanvas    = makeRoundImg(marsImg, 400);     hudMarsCanvas    = makeRoundImg(marsImg, HUD_ICON_D); };
+jupiterImg.onload = () => { jupiterCanvas = makeRoundImg(jupiterImg, 400);  hudJupiterCanvas = makeRoundImg(jupiterImg, HUD_ICON_D); };
+saturnImg.onload  = () => { saturnCanvas  = makeSaturnImg(saturnImg, 400);  hudSaturnCanvas  = makeSaturnImg(saturnImg, HUD_ICON_D); };
+uranusImg.onload  = () => { uranusCanvas  = makeRoundImg(uranusImg, 400);   hudUranusCanvas  = makeRoundImg(uranusImg, HUD_ICON_D); };
+neptuneImg.onload = () => { neptuneCanvas = makeRoundImg(neptuneImg, 400);  hudNeptuneCanvas = makeRoundImg(neptuneImg, HUD_ICON_D); };
+goalImg.onload    = () => { goalCanvas    = makeRoundImg(goalImg, 400);     hudGoalCanvas    = makeRoundImg(goalImg, HUD_ICON_D); };
 
 // すでにキャッシュ済みで onload が発火しない場合の保険
 function ensureCanvas(){
-  if(!earthCanvas   && earthImg.complete   && earthImg.naturalWidth)   earthCanvas   = makeRoundImg(earthImg, 400);
-  if(!moonCanvas    && moonImg.complete    && moonImg.naturalWidth)     moonCanvas    = makeRoundImg(moonImg, 400);
-  if(!marsCanvas    && marsImg.complete    && marsImg.naturalWidth)     marsCanvas    = makeRoundImg(marsImg, 400);
-  if(!jupiterCanvas && jupiterImg.complete && jupiterImg.naturalWidth)  jupiterCanvas = makeRoundImg(jupiterImg, 400);
-  if(!saturnCanvas  && saturnImg.complete  && saturnImg.naturalWidth)   saturnCanvas  = makeSaturnImg(saturnImg, 400);
-  if(!uranusCanvas  && uranusImg.complete  && uranusImg.naturalWidth)   uranusCanvas  = makeRoundImg(uranusImg, 400);
-  if(!neptuneCanvas && neptuneImg.complete && neptuneImg.naturalWidth)  neptuneCanvas = makeRoundImg(neptuneImg, 400);
-  if(!goalCanvas    && goalImg.complete    && goalImg.naturalWidth)     goalCanvas    = makeRoundImg(goalImg, 400);
+  if(!earthCanvas   && earthImg.complete   && earthImg.naturalWidth)   { earthCanvas   = makeRoundImg(earthImg, 400);   hudEarthCanvas   = makeRoundImg(earthImg, HUD_ICON_D); }
+  if(!moonCanvas    && moonImg.complete    && moonImg.naturalWidth)     { moonCanvas    = makeRoundImg(moonImg, 400);     hudMoonCanvas    = makeRoundImg(moonImg, HUD_ICON_D); }
+  if(!marsCanvas    && marsImg.complete    && marsImg.naturalWidth)     { marsCanvas    = makeRoundImg(marsImg, 400);     hudMarsCanvas    = makeRoundImg(marsImg, HUD_ICON_D); }
+  if(!jupiterCanvas && jupiterImg.complete && jupiterImg.naturalWidth)  { jupiterCanvas = makeRoundImg(jupiterImg, 400);  hudJupiterCanvas = makeRoundImg(jupiterImg, HUD_ICON_D); }
+  if(!saturnCanvas  && saturnImg.complete  && saturnImg.naturalWidth)   { saturnCanvas  = makeSaturnImg(saturnImg, 400);  hudSaturnCanvas  = makeSaturnImg(saturnImg, HUD_ICON_D); }
+  if(!uranusCanvas  && uranusImg.complete  && uranusImg.naturalWidth)   { uranusCanvas  = makeRoundImg(uranusImg, 400);   hudUranusCanvas  = makeRoundImg(uranusImg, HUD_ICON_D); }
+  if(!neptuneCanvas && neptuneImg.complete && neptuneImg.naturalWidth)  { neptuneCanvas = makeRoundImg(neptuneImg, 400);  hudNeptuneCanvas = makeRoundImg(neptuneImg, HUD_ICON_D); }
+  if(!goalCanvas    && goalImg.complete    && goalImg.naturalWidth)     { goalCanvas    = makeRoundImg(goalImg, 400);     hudGoalCanvas    = makeRoundImg(goalImg, HUD_ICON_D); }
 }
 
 // ステージ定義（全7ミッション・絵文字なし・距離半分版）
@@ -602,42 +607,49 @@ const STAGES=[
     id:1, goal:1200, heartCount:6, label:'ミッション１：心不全の鑑別', bgHue:220, debrisSpd:1.0,
     launchText:'地球を出発！', arriveText:'月に到着！',
     getFrom:()=>earthCanvas, getTo:()=>moonCanvas,
+    getHudFrom:()=>hudEarthCanvas, getHudTo:()=>hudMoonCanvas,
     fromColor:'#3a8fd4', toColor:'#b0b0b0',
   },
   {
     id:2, goal:1600, heartCount:6, label:'ミッション２：収縮期雑音の鑑別', bgHue:20, debrisSpd:1.4,
     launchText:'月を出発！', arriveText:'火星に到着！',
     getFrom:()=>moonCanvas, getTo:()=>marsCanvas,
+    getHudFrom:()=>hudMoonCanvas, getHudTo:()=>hudMarsCanvas,
     fromColor:'#b0b0b0', toColor:'#c1440e',
   },
   {
     id:3, goal:2000, heartCount:6, label:'ミッション３：大動脈弁疾患の鑑別', bgHue:40, debrisSpd:1.8,
     launchText:'火星を出発！', arriveText:'木星に到着！',
     getFrom:()=>marsCanvas, getTo:()=>jupiterCanvas,
+    getHudFrom:()=>hudMarsCanvas, getHudTo:()=>hudJupiterCanvas,
     fromColor:'#c1440e', toColor:'#e3bb76',
   },
   {
     id:4, goal:2500, heartCount:6, label:'ミッション４：僧帽弁疾患の鑑別', bgHue:50, debrisSpd:2.2,
     launchText:'木星を出発！', arriveText:'土星に到着！',
     getFrom:()=>jupiterCanvas, getTo:()=>saturnCanvas,
+    getHudFrom:()=>hudJupiterCanvas, getHudTo:()=>hudSaturnCanvas,
     fromColor:'#e3bb76', toColor:'#dfd193',
   },
   {
     id:5, goal:3000, heartCount:6, label:'ミッション５：心筋症の鑑別', bgHue:180, debrisSpd:2.6,
     launchText:'土星を出発！', arriveText:'天王星に到着！',
     getFrom:()=>saturnCanvas, getTo:()=>uranusCanvas,
+    getHudFrom:()=>hudSaturnCanvas, getHudTo:()=>hudUranusCanvas,
     fromColor:'#dfd193', toColor:'#ace5ee',
   },
   {
     id:6, goal:3500, heartCount:6, label:'ミッション６：肺高血圧の鑑別', bgHue:210, debrisSpd:3.0,
     launchText:'天王星を出発！', arriveText:'海王星に到着！',
     getFrom:()=>uranusCanvas, getTo:()=>neptuneCanvas,
+    getHudFrom:()=>hudUranusCanvas, getHudTo:()=>hudNeptuneCanvas,
     fromColor:'#ace5ee', toColor:'#4b70dd',
   },
   {
     id:7, goal:4000, heartCount:9, label:'最終ミッション：心疾患の鑑別', bgHue:280, debrisSpd:3.5,
     launchText:'海王星を出発！', arriveText:'心臓星に到着！',
     getFrom:()=>neptuneCanvas, getTo:()=>goalCanvas,
+    getHudFrom:()=>hudNeptuneCanvas, getHudTo:()=>hudGoalCanvas,
     fromColor:'#4b70dd', toColor:'#ffffff',
   },
 ];
@@ -666,13 +678,13 @@ let currentBlock = null;
 // iOSではユーザー操作のタイミングでAudioContextをresumeしないと音が出ない
 let _audioUnlocked = false;
 function unlockAudio() {
-  if (_audioUnlocked) return;
-  _audioUnlocked = true;
-  // AudioContextをユーザー操作内でresumeする
+  // iOSではユーザー操作のたびにresumeが必要なので、フラグで止めない
   const ac = getAC();
   if (ac.state === 'suspended') {
     ac.resume().catch(() => {});
   }
+  if (_audioUnlocked) return;
+  _audioUnlocked = true;
   // iOS Safari用：無音バッファを1度再生してAudioContextをアクティブ化
   try {
     const buf = ac.createBuffer(1, 1, 22050);
@@ -686,6 +698,10 @@ function unlockAudio() {
   silentAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
   silentAudio.volume = 0;
   silentAudio.play().catch(() => {});
+  // 心音BGMが止まっていたら再開
+  if (currentBgm && currentBgm.paused && currentBgmFile) {
+    currentBgm.play().catch(() => {});
+  }
 }
 
 // ===== BGM / 心音管理 =====
@@ -1801,7 +1817,8 @@ let heartSetClearTimer = 0;
 const HEART_SET_WAIT = 2.5;
 let lastMissedAnswer = null;
 let heartSpawnCount = 0; // 現ステージでのハート出現回数 // 正解ハートを逃したときの正解ラベル
-let hudProgress = 0;    // 進捗バー表示用（滑らかに補間）
+let hudProgress = 0;    // 進捗バー表示用（実際の表示値）
+let hudTarget   = 0;    // 進捗バーの目標値（ハート出現ごとに更新）
 let playingTime = 0;    // playing状態の経過時間（秒）
 
 function spawnHeartSets(){
@@ -1810,6 +1827,10 @@ function spawnHeartSets(){
   heartSetClearTimer = 0;
   lastMissedAnswer = null; // 次のハート出現でリセット
   heartSpawnCount++;
+  // ハート出現のたびに進捗バーの目標値を更新
+  { const maxH = st().heartCount || 6;
+    hudTarget = heartSpawnCount / maxH;
+  }
   const vy = 0.48 + speed * 0.7;
 
   // ステージに対応したブロックをランダムに選ぶ
@@ -1981,28 +2002,22 @@ function drawOriginPlanet(){
 // --- 目標天体（背景接近）：位置と見え方の再調整 ---
 function drawBgDest(){
   const s = st();
-  const ddist = s.goal - dist;
-  if(ddist < 0) return;
+  const maxHearts = s.heartCount || 6;
 
-  const t = 1 - (ddist / s.goal);
+  // ハートのクリア数を進捗として使う（0.0〜1.0）
+  // hudProgress は一定速度で追いかけるので、それをそのまま使う
+  const t = Math.min(1.0, hudProgress);
 
-  // --- サイズの調整 ---
-  // Math.powを2.5に下げ、初期サイズ（0.05）を少し上げました
-  // これにより、スタート直後から「小さな円」として認識できるようになります
-  const easeT = Math.pow(t, 2.5); 
-  const r = (0.05 + easeT * 7.5) * 45; 
+  const easeT = Math.pow(t, 2.5);
+  // t=1.0（全ハートクリア）で最大サイズ到達
+  const r = (0.05 + easeT * 7.5) * 45;
 
-  // --- 位置の調整 ---
-  // 開始位置（H * 0.12）を以前より下げて、HUDのバー（上部）と重ならないようにしました
-  // 到着時は H * 0.45 まで降りてくるので、よりダイナミックになります
   const dy = H * 0.12 + easeT * (H * 0.45 - H * 0.12);
-  
-  bgDestLastR = r; 
+
+  bgDestLastR = r;
   bgDestLastY = dy;
 
-  // --- 透明度の調整 ---
-  // 最初から 40% 程度の不透明度で見えるようにして、存在感を強めました
-  const alpha = 0.4 + t * 0.6; 
+  const alpha = 0.4 + t * 0.6;
 
   drawPlanet(W/2, dy, r, alpha, s.getTo(), s.toColor);
 }
@@ -2233,11 +2248,11 @@ function drawHUD(){
     ctx.restore();
   }
 
-  // 出発惑星
-  drawPlanetIcon(s.getFrom(), fromX, BAR_Y, ICO, s.fromColor);
+  // 出発惑星（HUD専用高解像度キャッシュを使用）
+  drawPlanetIcon(s.getHudFrom ? s.getHudFrom() : s.getFrom(), fromX, BAR_Y, ICO, s.fromColor);
 
-  // 目標惑星
-  drawPlanetIcon(s.getTo(), toX, BAR_Y, ICO, s.toColor);
+  // 目標惑星（HUD専用高解像度キャッシュを使用）
+  drawPlanetIcon(s.getHudTo ? s.getHudTo() : s.getTo(), toX, BAR_Y, ICO, s.toColor);
 
   // 進行バー
   ctx.save();
@@ -2251,6 +2266,26 @@ function drawHUD(){
   ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.beginPath(); ctx.arc(Math.min(LEFT_X+bfill,LEFT_X+BAR_W),BAR_Y,3,0,Math.PI*2); ctx.fill();
   ctx.strokeStyle='rgba(150,200,255,0.2)'; ctx.lineWidth=1; ctx.beginPath(); ctx.roundRect(LEFT_X,BAR_Y-BAR_H/2,BAR_W,BAR_H,3); ctx.stroke();
   ctx.restore();
+
+  // 左右移動ガイド矢印（ロケットの左右・プレイ中のみ）
+  if(state === 'playing'){
+    const ry = H - 90; // ロケットのY座標
+    const arrowY = ry - 2;
+    const alpha = 0.18 + 0.07 * Math.sin(Date.now() * 0.002); // ゆっくり点滅
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#aaddff';
+    ctx.font = "18px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // 左矢印（画面左端）
+    ctx.fillText('◀', 16, arrowY);
+    // 右矢印（画面右端）
+    ctx.fillText('▶', W - 16, arrowY);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+  }
 
   // エネルギーバー（右下）
   const BAR_FULL_W = 110;
@@ -3766,16 +3801,15 @@ function loop(ts){
     starScroll+=speed*dt*120;
 
 
-    // 進捗バー：一定速度で増加し、全ハート完了時にちょうど1.0になる
+
+    // 進捗バー：ハート出現ごとに目標値を更新し、一定速度で近づく
     { const maxHearts = s.heartCount || 6;
       const done = heartSpawnCount >= maxHearts && !heartSetActive && heartSetClearTimer <= 0;
-      if (done) {
-        hudProgress = 1.0;
-      } else {
-        // 0.99を上限に一定速度で増加（速度 = 0.99 / totalDuration）
-        // 1セットの平均所要時間を計測値から算出：spawnTimer初期1.5秒 + HEART_SET_WAIT2.5秒 + ハート落下約4秒 = 約8秒
-        const totalDuration = maxHearts * 8.0;
-        hudProgress = Math.min(0.99, hudProgress + (0.99 / totalDuration) * dt);
+      if (done) hudTarget = 1.0;
+      // 一定速度（1セット分を約4秒で移動）でtargetに近づく
+      const step = (1.0 / maxHearts) / 4.0;
+      if (hudProgress < hudTarget) {
+        hudProgress = Math.min(hudTarget, hudProgress + step * dt);
       }
     }
 
@@ -3987,7 +4021,7 @@ function startStage(idx){
   rocketX=W/2; rocketVX=0; rocketTilt=0; speed=FIXED_SPEED; dist=0;
   debris=[]; items=[]; particles=[]; ufos=[]; astronauts=[]; blackholes=[]; suckingObjects=[];
   blackholeUsed=false;
-  heartSetActive=false; heartSetClearTimer=0; lastMissedAnswer=null; heartSpawnCount=0; hudProgress=0; playingTime=0;
+  heartSetActive=false; heartSetClearTimer=0; lastMissedAnswer=null; heartSpawnCount=0; hudProgress=0; hudTarget=0; playingTime=0;
   spawnTimer=1.5; hitFlash=0; pickupFlash=0; shakeX=0; shakeY=0;
   launchT=0; arriveT=0; bgDestLastR=0; bgDestLastY=0;
   starScroll=0; state='launch_anim';
@@ -4133,8 +4167,7 @@ document.addEventListener('keyup',e=>{
 // =========================
 cv.addEventListener('touchstart',e=>{
   e.preventDefault();
-  unlockAudio(); // iOS Audio アンロック
-  if(state === 'playing') return;
+  unlockAudio(); // iOS Audio アンロック（毎回resume）
 
   const t = e.touches[0];
   if(!t) return;
@@ -4142,6 +4175,13 @@ cv.addEventListener('touchstart',e=>{
   const rect = cv.getBoundingClientRect();
   const mx = (t.clientX - rect.left) * (W / rect.width);
   const my = (t.clientY - rect.top) * (H / rect.height);
+
+  // playing中はタッチ位置で左右移動を即開始
+  if(state === 'playing'){
+    keys['ArrowLeft']  = mx < W / 2;
+    keys['ArrowRight'] = mx >= W / 2;
+    return;
+  }
 
   const stage = getClickedStage(mx, my);
 

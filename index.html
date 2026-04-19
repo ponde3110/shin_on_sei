@@ -1,0 +1,4562 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>心音の旅　心臓星を目指して</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: #000008;
+  overflow: hidden;
+  font-family: var(--font-sans, -apple-system, sans-serif);
+}
+
+/* ゲーム全体のラッパー：画面中央に縦長キャンバスを配置 */
+#rw {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  /* PCではmax-widthで横が広がりすぎないようにする */
+}
+
+#rwrap {
+  position: relative;
+  display: inline-block;
+  /* JS側で width/height をセット */
+}
+
+#rc {
+  display: block;
+}
+
+#rctrl { display: none; }
+
+#startBtn {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 33%;
+  z-index: 10;
+
+  white-space: nowrap;
+  min-width: 140px;
+
+  padding: 12px 28px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  line-height: 1;
+
+  color: #ffffff;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 999px;
+  cursor: pointer;
+  overflow: visible;
+
+  background:
+    radial-gradient(circle at 50% 35%,
+      rgba(180,240,255,0.9) 0%,
+      rgba(0,200,255,0.95) 35%,
+      rgba(0,110,255,0.95) 70%,
+      rgba(0,60,180,0.95) 100%
+    );
+
+  box-shadow:
+    0 0 12px rgba(0,220,255,0.55),
+    0 0 30px rgba(0,220,255,0.35),
+    0 10px 24px rgba(0,0,0,0.45);
+
+  text-shadow: 0 0 8px rgba(255,255,255,0.45);
+
+  transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
+  animation: cosmicLaunch 2.5s infinite ease-in-out;
+}
+
+#heartPlanetWrap {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 160px;
+  height: 160px;
+  z-index: 5;
+}
+
+/* 中央の心臓星 */
+#heartPlanet {
+  position: absolute;
+  width: 110px;
+  height: 110px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+
+/* 公転軌道 */
+#orbitPath {
+  position: absolute;
+  inset: 0;
+  animation: orbitAround 8s linear infinite;
+  transform-origin: center center;
+}
+
+/* 聴診器本体 */
+#orbitStethoscope {
+  position: absolute;
+  width: 70px;
+  height: auto;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) translateY(-65px) rotate(133deg);
+  z-index: 6;
+  opacity: 1;
+  filter:
+    drop-shadow(0 0 4px rgba(255,255,255,0.9))
+    drop-shadow(0 0 10px rgba(200,220,255,0.6))
+    drop-shadow(0 0 20px rgba(150,180,255,0.35));
+}
+
+/* 軌跡リング */
+#orbitPath::before {
+  content: "";
+  position: absolute;
+  width: 130px;
+  height: 130px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 0 8px rgba(255,255,255,0.05), 0 0 14px rgba(0,220,255,0.06);
+}
+
+@keyframes orbitAround {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes stethoFaceCenter {
+  from { transform: translate(-50%, -50%) translateY(-54px) rotate(180deg); }
+  to   { transform: translate(-50%, -50%) translateY(-54px) rotate(-180deg); }
+}
+
+#startBtn::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 999px;
+  background: radial-gradient(ellipse, rgba(0,220,255,0.22) 0%, rgba(0,220,255,0.08) 60%, transparent 80%);
+  z-index: -1;
+}
+
+#startBtn:hover {
+  transform: translateX(-50%) scale(1.05);
+  filter: brightness(1.08);
+  box-shadow: 0 0 18px rgba(0,240,255,0.75), 0 0 36px rgba(0,240,255,0.45), 0 12px 28px rgba(0,0,0,0.5);
+}
+
+#startBtn:active {
+  transform: translateX(-50%) scale(0.97);
+}
+
+@keyframes cosmicLaunch {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(0,220,255,0.5), 0 0 28px rgba(0,220,255,0.3), 0 10px 24px rgba(0,0,0,0.45);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(120,240,255,0.9), 0 0 42px rgba(0,220,255,0.45), 0 10px 24px rgba(0,0,0,0.45);
+  }
+}
+
+#startBtn.hidden { display: none; }
+
+/* ===== お祝いオーバーレイ ===== */
+#celebrationOverlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 40%, #0d0030 0%, #000818 60%, #000005 100%);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+#celebrationOverlay.active { display: flex; }
+
+#celebBgCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+#journeyReplay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  animation: journeyFadeOut 1.0s ease 2.8s forwards;
+}
+@keyframes journeyFadeOut {
+  0%   { opacity:1; }
+  100% { opacity:0; }
+}
+#journeyTrail {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  position: absolute;
+  white-space: nowrap;
+  animation: journeySweep 2.6s cubic-bezier(0.25,0.1,0.25,1) forwards;
+}
+@keyframes journeySweep {
+  0%   { transform: translateX(420px); opacity:0; }
+  12%  { opacity:1; }
+  80%  { opacity:1; }
+  100% { transform: translateX(-420px); opacity:0; }
+}
+.journey-planet { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; image-rendering: high-quality; }
+.journey-saturn { width: 46px; height: 28px; border-radius: 0; flex-shrink: 0; }
+.journey-line   { width: 18px; height: 2px; flex-shrink: 0; opacity: 0.5; }
+.journey-rocket { font-size: 18px; margin: 0 6px; display: inline-block; animation: rocketBob 0.5s ease-in-out infinite alternate; }
+@keyframes rocketBob {
+  from { transform: translateY(-2px); }
+  to   { transform: translateY(2px); }
+}
+
+#arrivalFlash {
+  position: absolute;
+  inset: 0;
+  background: white;
+  opacity: 0;
+  pointer-events: none;
+  animation: flashBurst 0.5s ease-out 2.8s forwards;
+}
+@keyframes flashBurst {
+  0%   { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+
+#mergeArea {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  flex-shrink: 0;
+  opacity: 0;
+  animation: mergeAreaAppear 0.8s ease 0.2s forwards;
+}
+@keyframes mergeAreaAppear {
+  from { opacity:0; }
+  to   { opacity:1; }
+}
+
+.glow-ring {
+  position: absolute;
+  left: 50%; top: 50%;
+  border-radius: 50%;
+  transform: translate(-50%,-50%);
+  border: 1.5px solid;
+  pointer-events: none;
+  opacity: 0;
+}
+#ring1 { width: 130px; height: 130px; border-color: rgba(255,200,100,0.6); animation: ringPulse 2.0s ease-out 3.8s infinite; }
+#ring2 { width: 160px; height: 160px; border-color: rgba(255,120,180,0.4); animation: ringPulse 2.0s ease-out 4.05s infinite; }
+#ring3 { width: 195px; height: 195px; border-color: rgba(120,180,255,0.25); animation: ringPulse 2.0s ease-out 4.3s infinite; }
+@keyframes ringPulse {
+  0%   { transform: translate(-50%,-50%) scale(0.9); opacity:0.8; }
+  60%  { opacity:0.5; }
+  100% { transform: translate(-50%,-50%) scale(1.25); opacity:0; }
+}
+
+#celebHeart {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 120px;
+  height: 120px;
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  animation: heartGrandEntrance 1.1s cubic-bezier(0.34,1.56,0.64,1) 3.0s forwards;
+  filter:
+    drop-shadow(0 0 22px rgba(255,100,160,1))
+    drop-shadow(0 0 50px rgba(255,60,120,0.7))
+    drop-shadow(0 0 80px rgba(200,40,100,0.4));
+}
+@keyframes heartGrandEntrance {
+  0%   { transform: translate(-50%,-50%) scale(0) rotate(-15deg); opacity:0; }
+  50%  { transform: translate(-50%,-50%) scale(1.25) rotate(5deg);  opacity:1; }
+  70%  { transform: translate(-50%,-50%) scale(0.92) rotate(-2deg); opacity:1; }
+  85%  { transform: translate(-50%,-50%) scale(1.08) rotate(1deg);  opacity:1; }
+  100% { transform: translate(-50%,-50%) scale(1.0)  rotate(0deg);  opacity:1; }
+}
+
+#celebStetho {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 130px;
+  height: auto;
+  transform-origin: center center;
+  animation:
+    stethoOrbit  3.0s linear 0s forwards,
+    stethoSettle 0.9s cubic-bezier(0.34,1.46,0.64,1) 3.0s forwards;
+  opacity: 1;
+  filter:
+    drop-shadow(0 0 5px rgba(255,255,255,1))
+    drop-shadow(0 0 14px rgba(200,230,255,0.8))
+    drop-shadow(0 0 28px rgba(150,190,255,0.5));
+}
+@keyframes stethoOrbit {
+  0%   { transform:translate(-50%,-50%) translateY(-82px) rotate(0deg)   scale(1.0); opacity:1; }
+  25%  { transform:translate(-50%,-50%) translateY(-82px) rotate(90deg)  scale(1.0); opacity:1; }
+  50%  { transform:translate(-50%,-50%) translateY(-82px) rotate(180deg) scale(1.0); opacity:1; }
+  75%  { transform:translate(-50%,-50%) translateY(-82px) rotate(270deg) scale(1.0); opacity:1; }
+  100% { transform:translate(-50%,-50%) translateY(-82px) rotate(360deg) scale(1.0); opacity:1; }
+}
+@keyframes stethoSettle {
+  0%   { transform:translate(-50%,-50%) translateY(-82px) rotate(360deg) scale(1.0); opacity:1; }
+  60%  { transform:translate(-50%,-50%) translate(52px, 42px) rotate(390deg) scale(1.1); opacity:1; }
+  100% { transform:translate(-50%,-50%) translate(48px, 40px) rotate(385deg) scale(1.0); opacity:1; }
+}
+
+#mergeFlash {
+  position: absolute; left: 50%; top: 50%;
+  width: 0; height: 0; border-radius: 50%;
+  transform: translate(-50%,-50%);
+  background: transparent;
+  border: 6px solid rgba(255,240,120,0);
+  animation: mergeFlashAnim 0.7s ease-out 3.7s forwards;
+  pointer-events: none;
+}
+@keyframes mergeFlashAnim {
+  0%   { width:0;     height:0;     border-color:rgba(255,240,120,1);   border-width:8px; }
+  100% { width:260px; height:260px; border-color:rgba(255,240,120,0);   border-width:1px; }
+}
+#mergeFlash2 {
+  position: absolute; left: 50%; top: 50%;
+  width: 0; height: 0; border-radius: 50%;
+  transform: translate(-50%,-50%);
+  background: transparent;
+  border: 4px solid rgba(255,160,220,0);
+  animation: mergeFlashAnim2 0.9s ease-out 3.85s forwards;
+  pointer-events: none;
+}
+@keyframes mergeFlashAnim2 {
+  0%   { width:0;     height:0;     border-color:rgba(255,160,220,0.9); border-width:5px; }
+  100% { width:300px; height:300px; border-color:rgba(255,160,220,0);   border-width:1px; }
+}
+
+#celebTitle {
+  margin-top: 14px;
+  font-size: 20px; font-weight: 900; color: #fff;
+  text-align: center; letter-spacing: 3px; line-height: 1.3;
+  text-shadow: 0 0 16px rgba(255,220,80,1), 0 0 36px rgba(255,160,40,0.8), 0 0 60px rgba(255,80,20,0.4);
+  animation: titleBlast 0.8s cubic-bezier(0.34,1.56,0.64,1) 4.0s both;
+}
+@keyframes titleBlast {
+  from { opacity:0; transform: scale(0.6) translateY(20px); letter-spacing:8px; }
+  to   { opacity:1; transform: scale(1)   translateY(0);    letter-spacing:3px; }
+}
+
+#celebSub {
+  margin-top: 8px;
+  font-size: 12px; color: rgba(200,230,255,0.95);
+  text-align: center; letter-spacing: 1px; line-height: 1.7;
+  animation: fadeSlideUp 0.7s ease 4.5s both;
+}
+
+#celebClose {
+  margin-top: 18px; padding: 11px 36px;
+  font-size: 14px; font-weight: 800; color: #fff;
+  background: linear-gradient(135deg, #ff5599 0%, #cc2277 50%, #880055 100%);
+  border: 1px solid rgba(255,180,220,0.5); border-radius: 999px;
+  cursor: pointer; letter-spacing: 1.5px;
+  box-shadow: 0 0 18px rgba(255,80,150,0.7), 0 0 40px rgba(255,40,120,0.35), 0 4px 16px rgba(0,0,0,0.5);
+  animation: fadeSlideUp 0.7s ease 4.8s both;
+  transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
+}
+#celebClose:hover {
+  transform: scale(1.06); filter: brightness(1.15);
+  box-shadow: 0 0 28px rgba(255,120,180,0.9), 0 0 55px rgba(255,60,140,0.5);
+}
+
+@keyframes fadeSlideUp {
+  from { opacity:0; transform: translateY(14px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+
+.confetti {
+  position: absolute; border-radius: 2px;
+  animation: confettiFall linear forwards;
+}
+@keyframes confettiFall {
+  0%   { transform: translateY(-20px) rotate(0deg) scaleX(1);    opacity:1; }
+  50%  { transform: translateY(260px) rotate(360deg) scaleX(0.6); opacity:0.9; }
+  100% { transform: translateY(540px) rotate(720deg) scaleX(1);   opacity:0; }
+}
+
+.sparkle {
+  position: absolute; pointer-events: none;
+  animation: sparklePop linear forwards;
+  font-size: 16px; line-height: 1;
+}
+@keyframes sparklePop {
+  0%   { transform: scale(0) rotate(0deg);    opacity:1; }
+  40%  { transform: scale(1.4) rotate(90deg); opacity:1; }
+  100% { transform: scale(0) rotate(180deg);  opacity:0; }
+}
+
+</style>
+<div id="rw">
+<div id="rwrap">
+<canvas id="rc"></canvas>
+<div id="heartPlanetWrap">
+  <img id="heartPlanet" src="goal.png" alt="goal">
+
+  <div id="orbitPath">
+    <img id="orbitStethoscope" src="stethoscope.png" alt="stethoscope">
+  </div>
+</div>
+<button id="startBtn">START MISSION</button>
+
+<!-- お祝いオーバーレイ -->
+<div id="celebrationOverlay">
+  <canvas id="celebBgCanvas"></canvas>
+
+  <!-- フェーズ1：旅の回想ベルト -->
+  <div id="journeyReplay">
+    <div id="journeyTrail"></div>
+  </div>
+
+  <!-- 到着フラッシュ -->
+  <div id="arrivalFlash"></div>
+
+  <!-- フェーズ2：中央ゴール演出 -->
+  <div id="mergeArea">
+    <div class="glow-ring" id="ring1"></div>
+    <div class="glow-ring" id="ring2"></div>
+    <div class="glow-ring" id="ring3"></div>
+    <img id="celebHeart" src="goal.png" alt="心臓星">
+    <img id="celebStetho" src="stethoscope.png" alt="聴診器">
+    <div id="mergeFlash"></div>
+    <div id="mergeFlash2"></div>
+  </div>
+
+  <div id="celebTitle">🌟 心臓星 到達！ 🌟<br><span style="font-size:13px;letter-spacing:1px;font-weight:700;opacity:0.85">全ミッション完全制覇</span></div>
+  <div id="celebSub">地球から遥かな航路を越えて——<br>あなたは心音のエキスパートだ！</div>
+  <button id="celebClose">もう一度プレイ</button>
+</div>
+
+<script>
+const cv=document.getElementById('rc');
+const ctx=cv.getContext('2d');
+const W=320,H=520;
+cv.width=W; cv.height=H;
+
+// レスポンシブ：スマホ縦画面にフィット、PCでは中央に縦長表示
+function resizeCanvas(){
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const scale = Math.min(vw / W, vh / H);
+  const dw = Math.round(W * scale);
+  const dh = Math.round(H * scale);
+  cv.style.width  = dw + 'px';
+  cv.style.height = dh + 'px';
+  const rwrap = document.getElementById('rwrap');
+  rwrap.style.width  = dw + 'px';
+  rwrap.style.height = dh + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// ボタン管理
+const startBtn=document.getElementById('startBtn');
+function updateBtn(){
+  if(state==='start'){
+    startBtn.textContent='スタート！';
+    startBtn.classList.remove('hidden');
+  }
+  else{
+    // nothing extra
+  }
+
+  if(state==='over'){
+    startBtn.textContent='再挑戦する';
+    startBtn.classList.remove('hidden');
+  }
+  else if(state==='stage_clear'){
+    const nextIdx=stageIdx+1;
+    const nextLabel=STAGES[nextIdx]?STAGES[nextIdx].label.split('：')[0]:'';
+    startBtn.textContent=(nextLabel?nextLabel:'次のミッション')+'へ出発！';
+    startBtn.classList.remove('hidden');
+  }
+  else if(state==='all_clear'){
+    // お祝いオーバーレイ側で「もう一度プレイ」を提供するため、ここではボタンを表示しない
+    startBtn.classList.add('hidden');
+  }
+  else if(state!=='start'){
+    startBtn.classList.add('hidden');
+  }
+}
+
+// --- 画像ロード ---
+const rocketImg    = new Image(); rocketImg.src = 'rocket.png';
+const moonImg      = new Image(); moonImg.src   = 'moon.png';
+const earthImg     = new Image(); earthImg.src  = 'earth.png';
+const marsImg      = new Image(); marsImg.src   = 'mars.png';
+const jupiterImg   = new Image(); jupiterImg.src = 'jupiter.png';
+const saturnImg    = new Image(); saturnImg.src  = 'saturn.png';
+const uranusImg    = new Image(); uranusImg.src  = 'uranus.png';
+const neptuneImg   = new Image(); neptuneImg.src = 'neptune.png';
+const goalImg      = new Image(); goalImg.src    = 'goal.png';
+const meteoriteImg = new Image(); meteoriteImg.src = 'meteorite.png';
+const heartImg     = new Image(); heartImg.src = 'heart.png';
+const ufoImg       = new Image(); ufoImg.src   = 'ufo.png';
+const astronautImg = new Image(); astronautImg.src = 'astronaut.png';
+const blackholeImg = new Image(); blackholeImg.src = 'blackhole.png';
+
+// 円形に切り抜いたオフスクリーンCanvas（通常惑星用）
+function makeRoundImg(img, diameter) {
+  const oc = document.createElement('canvas');
+  oc.width = oc.height = diameter;
+  const c = oc.getContext('2d');
+  c.imageSmoothingEnabled = true; 
+  c.imageSmoothingQuality = 'high';
+  c.beginPath(); 
+  c.arc(diameter / 2, diameter / 2, diameter / 2, 0, Math.PI * 2); 
+  c.clip();
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  const sq = Math.min(iw, ih);
+  c.drawImage(img, (iw - sq) / 2, (ih - sq) / 2, sq, sq, 0, 0, diameter, diameter);
+  return oc;
+}
+
+// 土星専用：リングを含む横長画像をそのままキャッシュ（クリップなし）
+// isSaturnLike=true の惑星は drawPlanet で特別扱い
+function makeSaturnImg(img, diameter) {
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  const aspect = iw / Math.max(ih, 1);
+  // リングを含む横幅に合わせてキャンバスを横長に確保
+  const cw = Math.round(diameter * Math.max(aspect, 1.8));
+  const ch = Math.round(cw / aspect);
+  const oc = document.createElement('canvas');
+  oc.width = cw; oc.height = ch;
+  oc._isSaturn = true; // 特別フラグ
+  oc._planetR = diameter / 2; // 惑星本体の半径（リング除く）
+  const c = oc.getContext('2d');
+  c.imageSmoothingEnabled = true;
+  c.imageSmoothingQuality = 'high';
+  c.drawImage(img, 0, 0, cw, ch);
+  return oc;
+}
+
+// 各惑星のCanvasを管理する変数
+let earthCanvas=null, moonCanvas=null, marsCanvas=null, jupiterCanvas=null, 
+    saturnCanvas=null, uranusCanvas=null, neptuneCanvas=null, goalCanvas=null;
+
+// 画像が読み込まれたらCanvasを生成
+earthImg.onload   = () => { earthCanvas   = makeRoundImg(earthImg, 400); };
+moonImg.onload    = () => { moonCanvas    = makeRoundImg(moonImg, 400); };
+marsImg.onload    = () => { marsCanvas    = makeRoundImg(marsImg, 400); };
+jupiterImg.onload = () => { jupiterCanvas = makeRoundImg(jupiterImg, 400); };
+saturnImg.onload  = () => { saturnCanvas  = makeSaturnImg(saturnImg, 400); };
+uranusImg.onload  = () => { uranusCanvas  = makeRoundImg(uranusImg, 400); };
+neptuneImg.onload = () => { neptuneCanvas = makeRoundImg(neptuneImg, 400); };
+goalImg.onload    = () => { goalCanvas    = makeRoundImg(goalImg, 400); };
+
+// すでにキャッシュ済みで onload が発火しない場合の保険
+function ensureCanvas(){
+  if(!earthCanvas   && earthImg.complete   && earthImg.naturalWidth)   earthCanvas   = makeRoundImg(earthImg, 400);
+  if(!moonCanvas    && moonImg.complete    && moonImg.naturalWidth)     moonCanvas    = makeRoundImg(moonImg, 400);
+  if(!marsCanvas    && marsImg.complete    && marsImg.naturalWidth)     marsCanvas    = makeRoundImg(marsImg, 400);
+  if(!jupiterCanvas && jupiterImg.complete && jupiterImg.naturalWidth)  jupiterCanvas = makeRoundImg(jupiterImg, 400);
+  if(!saturnCanvas  && saturnImg.complete  && saturnImg.naturalWidth)   saturnCanvas  = makeSaturnImg(saturnImg, 400);
+  if(!uranusCanvas  && uranusImg.complete  && uranusImg.naturalWidth)   uranusCanvas  = makeRoundImg(uranusImg, 400);
+  if(!neptuneCanvas && neptuneImg.complete && neptuneImg.naturalWidth)  neptuneCanvas = makeRoundImg(neptuneImg, 400);
+  if(!goalCanvas    && goalImg.complete    && goalImg.naturalWidth)     goalCanvas    = makeRoundImg(goalImg, 400);
+}
+
+// ステージ定義（全7ミッション・絵文字なし・距離半分版）
+const STAGES=[
+  {
+    id:1, goal:1200, heartCount:6, label:'ミッション１：心不全の鑑別', bgHue:220, debrisSpd:1.0,
+    launchText:'地球を出発！', arriveText:'月に到着！',
+    getFrom:()=>earthCanvas, getTo:()=>moonCanvas,
+    fromColor:'#3a8fd4', toColor:'#b0b0b0',
+  },
+  {
+    id:2, goal:1600, heartCount:6, label:'ミッション２：収縮期雑音の鑑別', bgHue:20, debrisSpd:1.4,
+    launchText:'月を出発！', arriveText:'火星に到着！',
+    getFrom:()=>moonCanvas, getTo:()=>marsCanvas,
+    fromColor:'#b0b0b0', toColor:'#c1440e',
+  },
+  {
+    id:3, goal:2000, heartCount:6, label:'ミッション３：大動脈弁疾患の鑑別', bgHue:40, debrisSpd:1.8,
+    launchText:'火星を出発！', arriveText:'木星に到着！',
+    getFrom:()=>marsCanvas, getTo:()=>jupiterCanvas,
+    fromColor:'#c1440e', toColor:'#e3bb76',
+  },
+  {
+    id:4, goal:2500, heartCount:6, label:'ミッション４：僧帽弁疾患の鑑別', bgHue:50, debrisSpd:2.2,
+    launchText:'木星を出発！', arriveText:'土星に到着！',
+    getFrom:()=>jupiterCanvas, getTo:()=>saturnCanvas,
+    fromColor:'#e3bb76', toColor:'#dfd193',
+  },
+  {
+    id:5, goal:3000, heartCount:6, label:'ミッション５：心筋症の鑑別', bgHue:180, debrisSpd:2.6,
+    launchText:'土星を出発！', arriveText:'天王星に到着！',
+    getFrom:()=>saturnCanvas, getTo:()=>uranusCanvas,
+    fromColor:'#dfd193', toColor:'#ace5ee',
+  },
+  {
+    id:6, goal:3500, heartCount:6, label:'ミッション６：肺高血圧の鑑別', bgHue:210, debrisSpd:3.0,
+    launchText:'天王星を出発！', arriveText:'海王星に到着！',
+    getFrom:()=>uranusCanvas, getTo:()=>neptuneCanvas,
+    fromColor:'#ace5ee', toColor:'#4b70dd',
+  },
+  {
+    id:7, goal:4000, heartCount:9, label:'最終ミッション：心疾患の鑑別', bgHue:280, debrisSpd:3.5,
+    launchText:'海王星を出発！', arriveText:'心臓星に到着！',
+    getFrom:()=>neptuneCanvas, getTo:()=>goalCanvas,
+    fromColor:'#4b70dd', toColor:'#ffffff',
+  },
+];
+
+// ===== 心音ブロック定義 =====
+const BLOCK_TYPES = [
+  { labels:["正常","心不全"], correct:"正常", comment:"ギャロップの有無を確認", sound:"apex.mp3", mission:1 },
+  { labels:["正常","心不全"], correct:"正常", comment:"ギャロップの有無を確認", sound:"base.mp3", mission:1 },
+  { labels:["正常","心不全"], correct:"心不全", comment:"ギャロップの有無を確認",   sound:"gallop.mp3", mission:1 },
+  { labels:["大動脈弁狭窄","僧帽弁逆流"], correct:"大動脈弁狭窄", comment:"Ⅱ音の有無に注目", sound:"SEM.mp3",    mission:2 },
+  { labels:["大動脈弁狭窄","僧帽弁逆流"], correct:"僧帽弁逆流", comment:"Ⅱ音の有無に注目",   sound:"HSM.mp3",    mission:2 },
+  { labels:["大動脈弁狭窄","大動脈弁逆流"], correct:"大動脈弁狭窄", comment:"収縮期と拡張期を認識", sound:"SEM.mp3", mission:3 },
+  { labels:["大動脈弁狭窄","大動脈弁逆流"], correct:"大動脈弁逆流", comment:"収縮期と拡張期を認識",  sound:"HDM.mp3", mission:3 },
+  { labels:["僧帽弁逆流","僧帽弁逸脱"],  correct:"僧帽弁逆流", comment:"Ⅰ音の有無に注目", sound:"HSM.mp3", mission:4 },
+  { labels:["僧帽弁逆流","僧帽弁逸脱"],  correct:"僧帽弁逸脱", comment:"Ⅰ音の有無に注目", sound:"LSM.mp3", mission:4 },
+  { labels:["拡張型心筋症","肥大型心筋症"], correct:"肥大型心筋症",　comment:"Ⅲ音とⅣ音に注目", sound:"S4.mp3", mission:5 },
+  { labels:["拡張型心筋症","肥大型心筋症"], correct:"拡張型心筋症",　comment:"Ⅲ音とⅣ音に注目", sound:"S3.mp3", mission:5 },
+  { labels:["心膜炎","肺高血圧"], correct:"心膜炎", comment:"独特な音感をを認識", sound:"rub.mp3", mission:6 },
+  { labels:["心膜炎","肺高血圧"], correct:"肺高血圧", comment:"独特な音感を認識", sound:"2P.mp3",  mission:6 },
+];
+
+// 現在のハートセットに割り当てられたブロック情報
+let currentBlock = null;
+
+// ===== BGM / 心音管理 =====
+let currentBgm = null;        // 現在再生中のBGM (Audio)
+let currentBgmFile = null;    // 現在再生中のファイル名
+let heartSoundAudio = null;   // 心音SE (Audio)
+
+// ステージ番号(1-7)に対応するmissionのブロックをランダム取得
+function getBlockForStage(stageId) {
+  let pool;
+  if (stageId === 7) {
+    // 最終ステージ: mission 1-6 からランダム
+    pool = BLOCK_TYPES.filter(b => b.mission >= 1 && b.mission <= 6);
+  } else {
+    pool = BLOCK_TYPES.filter(b => b.mission === stageId);
+  }
+  if (pool.length === 0) return BLOCK_TYPES[0];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// BGMを再生（同じファイルなら継続、変わる場合は切り替え）
+function playBgm(soundFile) {
+  if (currentBgmFile === soundFile && currentBgm && !currentBgm.paused) return;
+  stopBgm();
+  currentBgmFile = soundFile;
+  currentBgm = new Audio('sound/' + soundFile);
+  currentBgm.loop = true;
+  currentBgm.volume = 0.55;
+  currentBgm.play().catch(() => {});
+}
+
+function stopBgm() {
+  if (currentBgm) {
+    currentBgm.pause();
+    currentBgm.currentTime = 0;
+    currentBgm = null;
+  }
+  currentBgmFile = null;
+}
+
+// ===== Web Audio SE =====
+let _audioCtx = null;
+function getAC() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (_audioCtx.state === 'suspended') _audioCtx.resume();
+  return _audioCtx;
+}
+
+// 出発：ロケット噴射音（低周波ノイズ＋轟音ロール）
+let _launchSoundNode = null;
+function playLaunchSound() {
+  stopLaunchSound();
+  try {
+    const ac = getAC();
+    const gain = ac.createGain();
+    gain.gain.setValueAtTime(0, ac.currentTime);
+    gain.gain.linearRampToValueAtTime(0.04, ac.currentTime + 0.4);
+    gain.gain.setValueAtTime(0.04, ac.currentTime + 3.5);
+    gain.gain.linearRampToValueAtTime(0, ac.currentTime + 5.0);
+    gain.connect(ac.destination);
+    const bufLen = ac.sampleRate * 5.5;
+    const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+    const noise = ac.createBufferSource();
+    noise.buffer = buf;
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(220, ac.currentTime);
+    lp.frequency.linearRampToValueAtTime(480, ac.currentTime + 5.0);
+    lp.Q.value = 1.5;
+    noise.connect(lp); lp.connect(gain);
+    noise.start();
+    _launchSoundNode = { noise, gain };
+    const osc = ac.createOscillator();
+    const og = ac.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(55, ac.currentTime);
+    osc.frequency.linearRampToValueAtTime(90, ac.currentTime + 4.0);
+    og.gain.setValueAtTime(0, ac.currentTime);
+    og.gain.linearRampToValueAtTime(0.015, ac.currentTime + 0.6);
+    og.gain.linearRampToValueAtTime(0, ac.currentTime + 5.0);
+    osc.connect(og); og.connect(ac.destination);
+    osc.start(); osc.stop(ac.currentTime + 5.5);
+  } catch(e) {}
+}
+function stopLaunchSound() {
+  try {
+    if (_launchSoundNode) { _launchSoundNode.noise.stop(); _launchSoundNode = null; }
+  } catch(e) { _launchSoundNode = null; }
+}
+
+// 到着：空気を切り裂くホイッスル降下＋衝撃ドン
+function playArriveSound() {
+  try {
+    const ac = getAC();
+
+    // やさしい下降音
+    const osc = ac.createOscillator();
+    const og = ac.createGain();
+
+    osc.type = 'triangle'; // 柔らかい音
+    osc.frequency.setValueAtTime(1200, ac.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(300, ac.currentTime + 1.2);
+
+    og.gain.setValueAtTime(0.015, ac.currentTime);
+    og.gain.linearRampToValueAtTime(0, ac.currentTime + 1.4);
+
+    osc.connect(og);
+    og.connect(ac.destination);
+
+    osc.start();
+    osc.stop(ac.currentTime + 1.5);
+
+    // 軽い空気感だけ残すノイズ
+    const bufLen = ac.sampleRate * 1.2;
+    const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) d[i] = Math.random() * 2 - 1;
+
+    const ns = ac.createBufferSource();
+    ns.buffer = buf;
+
+    const hp = ac.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 1500;
+
+    const ng = ac.createGain();
+    ng.gain.setValueAtTime(0.006, ac.currentTime);
+    ng.gain.linearRampToValueAtTime(0, ac.currentTime + 1.2);
+
+    ns.connect(hp);
+    hp.connect(ng);
+    ng.connect(ac.destination);
+
+    ns.start();
+
+  } catch(e) {}
+}
+
+// 正解ハート取得：明るいチャイム
+function playCorrectSE() {
+  try {
+    const ac = getAC();
+    [523.25, 659.25, 783.99].forEach((f, i) => {
+      const osc = ac.createOscillator();
+      const g = ac.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = f;
+      g.gain.setValueAtTime(0, ac.currentTime + i * 0.09);
+      g.gain.linearRampToValueAtTime(0.05, ac.currentTime + i * 0.09 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i * 0.09 + 0.35);
+      osc.connect(g); g.connect(ac.destination);
+      osc.start(ac.currentTime + i * 0.09);
+      osc.stop(ac.currentTime + i * 0.09 + 0.4);
+    });
+  } catch(e) {}
+}
+
+// 不正解ハート取得：低い不協和音ブザー
+function playWrongSE() {
+  try {
+    const ac = getAC();
+    [180, 170].forEach((f) => {
+      const osc = ac.createOscillator();
+      const g = ac.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.value = f;
+      g.gain.setValueAtTime(0.03, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.45);
+      osc.connect(g); g.connect(ac.destination);
+      osc.start(); osc.stop(ac.currentTime + 0.5);
+    });
+  } catch(e) {}
+}
+
+// 正解ハートを逃した：スゥッと消える下降音
+function playMissSE() {
+  try {
+    const ac = getAC();
+    // メイン：高音から中音へ滑らかに落ちる笛のような音
+    const osc = ac.createOscillator();
+    const g = ac.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ac.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(280, ac.currentTime + 0.55);
+    g.gain.setValueAtTime(0.07, ac.currentTime);
+    g.gain.setValueAtTime(0.07, ac.currentTime + 0.1);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.65);
+    osc.connect(g); g.connect(ac.destination);
+    osc.start(); osc.stop(ac.currentTime + 0.7);
+    // サブ：わずかに遅れてより低い音が重なる（「スッ…」感）
+    const osc2 = ac.createOscillator();
+    const g2 = ac.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(440, ac.currentTime + 0.1);
+    osc2.frequency.exponentialRampToValueAtTime(160, ac.currentTime + 0.6);
+    g2.gain.setValueAtTime(0, ac.currentTime);
+    g2.gain.linearRampToValueAtTime(0.04, ac.currentTime + 0.15);
+    g2.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.65);
+    osc2.connect(g2); g2.connect(ac.destination);
+    osc2.start(ac.currentTime + 0.1); osc2.stop(ac.currentTime + 0.7);
+  } catch(e) {}
+}
+
+// 隕石衝突：ドスンと鈍い衝撃音
+function playMeteorHitSE() {
+  try {
+    const ac = getAC();
+    const osc = ac.createOscillator();
+    const og = ac.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(120, ac.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(40, ac.currentTime + 0.3);
+    og.gain.setValueAtTime(0.05, ac.currentTime);
+    og.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.35);
+    osc.connect(og); og.connect(ac.destination);
+    osc.start(); osc.stop(ac.currentTime + 0.4);
+    const bufLen = ac.sampleRate * 0.25;
+    const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / bufLen);
+    const ns = ac.createBufferSource();
+    ns.buffer = buf;
+    const ng = ac.createGain();
+    ng.gain.value = 0.03;
+    ns.connect(ng); ng.connect(ac.destination);
+    ns.start();
+  } catch(e) {}
+}
+
+// ===== UFO ループ音管理 =====
+let _ufoLoopNodes = null;
+
+function startUfoLoopSound() {
+  if (_ufoLoopNodes) return; // 既に再生中
+  try {
+    const ac = getAC();
+    const now = ac.currentTime;
+    const masterGain = ac.createGain();
+    masterGain.gain.setValueAtTime(0, now);
+    masterGain.gain.linearRampToValueAtTime(0.03, now + 0.4);
+    masterGain.connect(ac.destination);
+
+    const lfo = ac.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = 5.5;
+    const lfoGain = ac.createGain();
+    lfoGain.gain.value = 18;
+
+    const osc1 = ac.createOscillator();
+    osc1.type = 'sine';
+    osc1.frequency.value = 420;
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc1.frequency);
+    osc1.connect(masterGain);
+
+    const osc2 = ac.createOscillator();
+    osc2.type = 'triangle';
+    osc2.frequency.value = 840;
+    const g2 = ac.createGain();
+    g2.gain.value = 0.25;
+    osc2.connect(g2); g2.connect(masterGain);
+
+    lfo.start(); osc1.start(); osc2.start();
+    _ufoLoopNodes = { osc1, osc2, lfo, lfoGain, g2, masterGain };
+  } catch(e) {}
+}
+
+function stopUfoLoopSound() {
+  if (!_ufoLoopNodes) return;
+  try {
+    const ac = getAC();
+    const g = _ufoLoopNodes.masterGain;
+    g.gain.setValueAtTime(g.gain.value, ac.currentTime);
+    g.gain.linearRampToValueAtTime(0.001, ac.currentTime + 0.3);
+    const nodes = _ufoLoopNodes;
+    setTimeout(() => {
+      try { nodes.lfo.stop(); nodes.osc1.stop(); nodes.osc2.stop(); } catch(e) {}
+    }, 400);
+  } catch(e) {}
+  _ufoLoopNodes = null;
+}
+
+// ===== ブラックホール ループ音管理 =====
+let _bhLoopNodes = null;
+
+function startBlackholeLoopSound() {
+  if (_bhLoopNodes) return;
+  try {
+    const ac = getAC();
+    const now = ac.currentTime;
+    const masterGain = ac.createGain();
+    masterGain.gain.setValueAtTime(0, now);
+    masterGain.gain.linearRampToValueAtTime(0.045, now + 1.2);
+    masterGain.connect(ac.destination);
+
+    const lfo = ac.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = 0.3;
+    const lfoGain = ac.createGain();
+    lfoGain.gain.value = 8;
+
+    const osc1 = ac.createOscillator();
+    osc1.type = 'sine';
+    osc1.frequency.value = 42;
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc1.frequency);
+    osc1.connect(masterGain);
+
+    const osc2 = ac.createOscillator();
+    osc2.type = 'sawtooth';
+    osc2.frequency.value = 68;
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 180;
+    const g2 = ac.createGain();
+    g2.gain.value = 0.35;
+    osc2.connect(lp); lp.connect(g2); g2.connect(masterGain);
+
+    lfo.start(); osc1.start(); osc2.start();
+    _bhLoopNodes = { osc1, osc2, lfo, masterGain };
+  } catch(e) {}
+}
+
+function stopBlackholeLoopSound() {
+  if (!_bhLoopNodes) return;
+  try {
+    const ac = getAC();
+    const g = _bhLoopNodes.masterGain;
+    g.gain.setValueAtTime(g.gain.value, ac.currentTime);
+    g.gain.linearRampToValueAtTime(0.001, ac.currentTime + 0.8);
+    const nodes = _bhLoopNodes;
+    setTimeout(() => {
+      try { nodes.lfo.stop(); nodes.osc1.stop(); nodes.osc2.stop(); } catch(e) {}
+    }, 900);
+  } catch(e) {}
+  _bhLoopNodes = null;
+}
+
+// UFO出現：宇宙的なビュイーン音
+function playUfoAppearSE() {
+  try {
+    const ac = getAC();
+    const now = ac.currentTime;
+    // ビュイーン上昇音
+    const osc = ac.createOscillator();
+    const g = ac.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(200, now);
+    osc.frequency.exponentialRampToValueAtTime(900, now + 0.5);
+    osc.frequency.exponentialRampToValueAtTime(600, now + 0.9);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.06, now + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+    osc.connect(g); g.connect(ac.destination);
+    osc.start(now); osc.stop(now + 1.1);
+    // トレモロ成分（UFOらしいウォブル）
+    const osc2 = ac.createOscillator();
+    const g2 = ac.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(440, now + 0.1);
+    osc2.frequency.setValueAtTime(480, now + 0.3);
+    osc2.frequency.setValueAtTime(420, now + 0.6);
+    g2.gain.setValueAtTime(0, now + 0.1);
+    g2.gain.linearRampToValueAtTime(0.04, now + 0.2);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+    osc2.connect(g2); g2.connect(ac.destination);
+    osc2.start(now + 0.1); osc2.stop(now + 1.1);
+  } catch(e) {}
+}
+
+// ブラックホール出現：不気味な低音うなり
+function playBlackholeAppearSE() {
+  try {
+    const ac = getAC();
+    const now = ac.currentTime;
+    // 重低音のうなり
+    const osc = ac.createOscillator();
+    const g = ac.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(60, now);
+    osc.frequency.linearRampToValueAtTime(35, now + 2.5);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.10, now + 0.6);
+    g.gain.setValueAtTime(0.10, now + 1.5);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 3.0);
+    osc.connect(g); g.connect(ac.destination);
+    osc.start(now); osc.stop(now + 3.1);
+    // 歪み成分
+    const osc2 = ac.createOscillator();
+    const g2 = ac.createGain();
+    osc2.type = 'sawtooth';
+    osc2.frequency.setValueAtTime(80, now + 0.3);
+    osc2.frequency.linearRampToValueAtTime(45, now + 2.5);
+    g2.gain.setValueAtTime(0, now + 0.3);
+    g2.gain.linearRampToValueAtTime(0.04, now + 0.8);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 3.0);
+    osc2.connect(g2); g2.connect(ac.destination);
+    osc2.start(now + 0.3); osc2.stop(now + 3.1);
+    // ノイズ（宇宙の歪み感）
+    const bufLen = ac.sampleRate * 2.5;
+    const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for(let i = 0; i < bufLen; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i/bufLen, 0.5);
+    const ns = ac.createBufferSource();
+    ns.buffer = buf;
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 200;
+    const ng = ac.createGain();
+    ng.gain.setValueAtTime(0.03, now);
+    ng.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
+    ns.connect(lp); lp.connect(ng); ng.connect(ac.destination);
+    ns.start(now);
+  } catch(e) {}
+}
+
+// 宇宙飛行士救助：キラキラ上昇音
+function playRescueSE() {
+  try {
+    const ac = getAC();
+    [440, 554, 659, 880].forEach((f, i) => {
+      const osc = ac.createOscillator();
+      const g = ac.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = f;
+      g.gain.setValueAtTime(0, ac.currentTime + i * 0.07);
+      g.gain.linearRampToValueAtTime(0.04, ac.currentTime + i * 0.07 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i * 0.07 + 0.30);
+      osc.connect(g); g.connect(ac.destination);
+      osc.start(ac.currentTime + i * 0.07);
+      osc.stop(ac.currentTime + i * 0.07 + 0.35);
+    });
+  } catch(e) {}
+}
+
+// クリア済みミッション数（航路マップのクリック可能範囲を管理）
+// localStorageから復元（保存されていなければ0）
+let completedCount = (() => {
+  try {
+    const saved = localStorage.getItem('shinon_completedCount');
+    return saved !== null ? Math.min(7, Math.max(0, parseInt(saved, 10) || 0)) : 0;
+  } catch(e) { return 0; }
+})();
+
+function saveCompletedCount() {
+  try { localStorage.setItem('shinon_completedCount', String(completedCount)); } catch(e) {}
+}
+
+let stageIdx=0;
+const st=()=>STAGES[stageIdx];
+
+const FIXED_SPEED=0.45;
+const LIFE_MAX=30; // 後方互換のため残す
+const ENERGY_MAX=100; // エネルギーの最大値
+const ENERGY_MOVE_COST=3; // 移動1秒あたりのエネルギー消費
+const ENERGY_HIT_COST=18;   // 隕石衝突時のエネルギー消費
+const ENERGY_MISS_COST=10;  // 正解ハートを逃した時のエネルギー消費
+const ENERGY_WRONG_COST=35; // 不正解ハート取得時のエネルギー消費
+const ENERGY_BH_COST=0;    // ブラックホール接触時のエネルギー消費
+const ENERGY_HEART_GAIN=25; // 正解ハート取得時のエネルギー回復
+const ENERGY_RESCUE_GAIN=100;// 宇宙飛行士救助時のエネルギー回復
+
+const BG_STARS=[];
+for(let i=0;i<200;i++) BG_STARS.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.4+0.2,a:Math.random()});
+const NEBULAS=[];
+for(let i=0;i<7;i++) {
+  NEBULAS.push({
+    x: Math.random() * W,
+    y: Math.random() * H,
+    rx: 80 + Math.random() * 120,
+    ry: 40 + Math.random() * 70,
+    rot: Math.random() * Math.PI,
+    a: Math.random() * 0.13 + 0.06,
+    speed: 0.008 + Math.random() * 0.012
+  });
+}
+
+let state='start';
+let life=LIFE_MAX; // 後方互換のため残す（内部的にはenergyを使用）
+let energy=ENERGY_MAX; // エネルギー（0になるとゲームオーバー）
+let keys={},lastTime=0;
+let rocketX=W/2,rocketVX=0,rocketTilt=0;
+let speed=0,dist=0;
+let hitFlash=0,pickupFlash=0;
+let particles=[],debris=[],items=[];
+let spawnTimer=0,starScroll=0;
+let shakeX=0,shakeY=0;
+let launchT=0,arriveT=0;
+const LAUNCH_DUR=5.0,ARRIVE_DUR=5.0;
+let bgDestLastR=0,bgDestLastY=0;
+
+// UFO system
+let ufos=[];
+let ufoSpawnTimer=0; // 捕獲専用のみ使用（タイマー自動スポーンなし）
+let rocketShakeT=0; // for playing shake
+
+// 大破アニメーション
+let explosionT = 0;          // 大破アニメーションタイマー
+const EXPLOSION_DUR = 3.5;   // 大破演出の秒数
+let explosionParticles = [];  // 爆発パーティクル
+let explosionX = 0;           // 爆発位置X
+let explosionY = 0;           // 爆発位置Y
+let explosionPlayed = false;  // 効果音再生フラグ
+
+// 大破効果音（爆発・金属断裂・放電）
+function playExplosionSE() {
+  try {
+    const ac = getAC();
+    const now = ac.currentTime;
+
+    // 🌌 メイン爆発（低音）
+    const boom = ac.createOscillator();
+    const boomGain = ac.createGain();
+
+    boom.type = 'triangle';
+    boom.frequency.setValueAtTime(120, now);
+    boom.frequency.exponentialRampToValueAtTime(25, now + 0.8);
+
+    boomGain.gain.setValueAtTime(0.28, now); // ← 0.6 → 半分以下
+    boomGain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+
+    boom.connect(boomGain);
+    boomGain.connect(ac.destination);
+    boom.start(now);
+    boom.stop(now + 1.0);
+
+    // 🌫 爆風ノイズ
+    const bufLen = ac.sampleRate * 1.2;
+    const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
+    const data = buf.getChannelData(0);
+
+    for(let i = 0; i < bufLen; i++){
+      const decay = Math.pow(1 - i / bufLen, 1.5);
+      data[i] = (Math.random() * 2 - 1) * decay;
+    }
+
+    const noise = ac.createBufferSource();
+    noise.buffer = buf;
+
+    const filter = ac.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1200, now);
+
+    const ng = ac.createGain();
+    ng.gain.setValueAtTime(0.22, now); // ← 0.5 → 半分以下
+    ng.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+
+    noise.connect(filter);
+    filter.connect(ng);
+    ng.connect(ac.destination);
+    noise.start(now);
+
+    // 🔩 金属破片（控えめ）
+    setTimeout(() => {
+      try {
+        const ac2 = getAC();
+        const now2 = ac2.currentTime;
+
+        for(let i=0;i<3;i++){ // ← 4 → 3に減らす
+          const osc = ac2.createOscillator();
+          const g = ac2.createGain();
+
+          osc.type = 'square';
+          osc.frequency.value = 1500 + Math.random()*2500;
+
+          g.gain.setValueAtTime(0.04, now2); // ← 半減
+          g.gain.exponentialRampToValueAtTime(0.001, now2 + 0.15);
+
+          osc.connect(g);
+          g.connect(ac2.destination);
+
+          osc.start(now2);
+          osc.stop(now2 + 0.15);
+        }
+      } catch(e){}
+    }, 60);
+
+    // 🌌 余韻低音（かなり控えめ）
+    setTimeout(() => {
+      try {
+        const ac3 = getAC();
+        const now3 = ac3.currentTime;
+
+        const sub = ac3.createOscillator();
+        const sg = ac3.createGain();
+
+        sub.type = 'sine';
+        sub.frequency.setValueAtTime(50, now3);
+        sub.frequency.exponentialRampToValueAtTime(28, now3 + 0.8);
+
+        sg.gain.setValueAtTime(0.07, now3); // ← 0.15 → 半分以下
+        sg.gain.exponentialRampToValueAtTime(0.001, now3 + 0.9);
+
+        sub.connect(sg);
+        sg.connect(ac3.destination);
+
+        sub.start(now3);
+        sub.stop(now3 + 1.0);
+      } catch(e){}
+    }, 120);
+
+  } catch(e){}
+}
+
+// 爆発パーティクルを生成
+function spawnExplosionParticles(cx, cy) {
+  explosionParticles = [];
+
+  // 🔥 第1波：超高速コア炎球（白→橙→赤）
+  for(let i = 0; i < 80; i++){
+    const angle = Math.random() * Math.PI * 2;
+    const spd = 3.5 + Math.random() * 7.0;
+    const t = Math.random();
+    const color = t < 0.3 ? '#ffffff' : t < 0.6 ? '#ffee88' : t < 0.8 ? '#ff8800' : '#ff3300';
+    explosionParticles.push({
+      x: cx, y: cy,
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd,
+      r: 4 + Math.random() * 8,
+      life: 1, maxLife: 0.5 + Math.random() * 0.5,
+      color,
+      grav: 0.06, drag: 0.94,
+      isFireball: true
+    });
+  }
+
+  // 💥 第2波：中速の炎・オレンジ煙の混合
+  for(let i = 0; i < 60; i++){
+    const angle = Math.random() * Math.PI * 2;
+    const spd = 1.5 + Math.random() * 4.0;
+    const isSmoke = Math.random() < 0.4;
+    explosionParticles.push({
+      x: cx + (Math.random()-0.5)*10,
+      y: cy + (Math.random()-0.5)*10,
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd,
+      r: isSmoke ? 10 + Math.random()*16 : 3 + Math.random()*6,
+      life: 1, maxLife: isSmoke ? 1.5 + Math.random()*1.2 : 0.8 + Math.random()*0.6,
+      color: isSmoke ? `rgba(${60+Math.random()*40|0},${30+Math.random()*20|0},${10+Math.random()*10|0},0.7)` : '#ff6600',
+      grav: isSmoke ? -0.015 : 0.04,
+      drag: isSmoke ? 0.97 : 0.96,
+      isSmoke, isFireball: !isSmoke
+    });
+  }
+
+  // 🪨 ロケット破片（金属片・回転しながら放物線飛散）
+  const debrisColors = ['#aabbcc','#8899aa','#ccd0d4','#ff6600','#ffaa44','#334455'];
+  for(let i = 0; i < 22; i++){
+    const angle = Math.random() * Math.PI * 2;
+    const spd = 2.5 + Math.random() * 6.0;
+    explosionParticles.push({
+      x: cx + (Math.random()-0.5)*16,
+      y: cy + (Math.random()-0.5)*16,
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd - 1.5,
+      r: 3 + Math.random() * 6,
+      life: 1, maxLife: 2.0 + Math.random() * 2.0,
+      color: debrisColors[Math.floor(Math.random()*debrisColors.length)],
+      grav: 0.08, drag: 0.992,
+      rot: Math.random()*Math.PI*2,
+      rotV: (Math.random()-0.5) * 0.35,
+      isDebris: true,
+      trail: []
+    });
+  }
+
+  // ✨ 火の粉（細長い軌跡付き・放物線）
+  for(let i = 0; i < 55; i++){
+    const angle = -Math.PI*0.5 + (Math.random()-0.5)*Math.PI*2;
+    const spd = 2.0 + Math.random() * 6.5;
+    explosionParticles.push({
+      x: cx + (Math.random()-0.5)*8,
+      y: cy + (Math.random()-0.5)*8,
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd - 0.5,
+      r: 1.2 + Math.random() * 1.8,
+      life: 1, maxLife: 1.2 + Math.random() * 1.8,
+      color: Math.random() < 0.5 ? '#ffee66' : '#ff9922',
+      grav: 0.10, drag: 0.988,
+      isEmber: true,
+      trail: []
+    });
+  }
+
+  // 🌫 遅れて膨らむ煙雲（黒〜暗灰）
+  for(let i = 0; i < 28; i++){
+    const angle = Math.random() * Math.PI * 2;
+    const spd = 0.4 + Math.random() * 1.5;
+    const gray = 15 + Math.random()*35 | 0;
+    explosionParticles.push({
+      x: cx + (Math.random()-0.5)*20,
+      y: cy + (Math.random()-0.5)*20,
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd - 0.3,
+      r: 14 + Math.random() * 20,
+      life: 1, maxLife: 2.5 + Math.random() * 1.5,
+      color: `rgba(${gray},${gray},${gray},0.55)`,
+      grav: -0.008, drag: 0.975,
+      isSmokePuff: true,
+      delay: 0.15 + Math.random() * 0.35
+    });
+  }
+}
+
+// ブラックホール
+let blackholes=[];
+let blackholeSpawnTimer=2+Math.random()*2; // 出現時間2秒＋ランダム0-2秒後
+let blackholeUsed=false; // 各ミッションで1回のみ
+
+// 宇宙飛行士
+let astronauts=[];
+let astronautSpawnTimer=30+Math.random()*25;
+
+const easeIn=t=>t*t;
+const easeOut=t=>1-(1-t)*(1-t);
+
+// --- 惑星描画（オフスクリーンをそのまま描画→真円、土星はリング付き横長） ---
+function drawPlanet(cx,cy,r,alpha,canvas,fallback){
+  ctx.save();
+  ctx.globalAlpha=alpha;
+  ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
+  if(canvas){
+    if(canvas._isSaturn){
+      // 土星：横長画像をアスペクト比を保ったまま描画（クリップなし）
+      const aspect = canvas.width / Math.max(canvas.height,1);
+      const drawH = r * 2;
+      const drawW = drawH * aspect;
+      ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height,
+                    cx - drawW/2, cy - drawH/2, drawW, drawH);
+    } else {
+      ctx.drawImage(canvas,0,0,canvas.width,canvas.height,cx-r,cy-r,r*2,r*2);
+    }
+  } else {
+    ctx.fillStyle=fallback; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// --- ブラックホール生成 ---
+function spawnBlackhole(){
+  // サイズを半分（W * 0.10 → 0.05）に変更
+  const maxR = Math.round(W * 0.05 + Math.random() * W * 0.01); 
+  const x = W * 0.20 + Math.random() * W * 0.60;
+  // 出現位置を画面の下半分（H * 0.5〜0.8）に調整
+  const y = H * 0.50 + Math.random() * H * 0.30; 
+  
+  blackholes.push({
+    x, y,
+    vy: 0,
+    r: 0,
+    maxR,
+    pullR: maxR * 5.0, // 引力の範囲もサイズに合わせて自動的に半分になります
+    rot: 0,
+    rotV: (Math.random() < 0.5 ? 1 : -1) * 0.004,
+    alive: true,
+    swallowing: false,
+    warpTime: 0,
+    noiseOff: Math.random() * 100,
+    phase: 'grow',
+    phaseTimer: 0,
+    growDur: 3.0,
+    wanderDur: 18.0 + Math.random() * 8.0,
+    shrinkDur: 3.0,
+    wanderVX: (Math.random()-0.5) * 0.4,
+    wanderVY: (Math.random()-0.5) * 0.3,
+    wanderTimer: 0,
+  });
+  playBlackholeAppearSE();
+}
+
+// ブラックホール描画
+function drawBlackhole(bh) {
+  bh.rot = (bh.rot || 0) + bh.rotV;
+  const r = bh.r;
+  const t = bh.rot * 8;
+  const cx = bh.x, cy = bh.y;
+  const no = bh.noiseOff || 0;
+
+  ctx.save();
+
+  // 1. 引力歪みライン（光の筋）
+  const WLINES = 24;
+  for(let i = 0; i < WLINES; i++){
+    const ang = (i / WLINES) * Math.PI * 2 + t * 0.15 + no * 0.01;
+    const wobble = 0.04 * Math.sin(i * 1.9 + t * 3.5 + no);
+    const a = ang + wobble;
+    const r0 = r * (0.55 + 0.08 * Math.sin(i * 2.1 + t * 4.0));
+    const r1 = r * (1.8  + 0.4  * Math.abs(Math.sin(i * 1.3 + t * 1.8 + no)));
+    const ax = cx + Math.cos(a) * r0, ay = cy + Math.sin(a) * r0;
+    const bx = cx + Math.cos(a) * r1, by = cy + Math.sin(a) * r1;
+    const br = 0.04 + 0.07 * Math.abs(Math.sin(i * 2.3 + t * 5.5 + no));
+    const wg = ctx.createLinearGradient(ax, ay, bx, by);
+    wg.addColorStop(0,   `rgba(160,180,255,${br})`);
+    wg.addColorStop(0.4, `rgba(100,130,220,${br*0.4})`);
+    wg.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.strokeStyle = wg;
+    ctx.lineWidth = 0.4 + 0.5 * Math.abs(Math.sin(i * 0.7 + t));
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+  }
+
+  // 2. blackhole.png 描画
+  if(blackholeImg.complete && blackholeImg.naturalWidth > 0){
+    // ── まず中央に「真っ黒な下地」を作る ──
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    // 画像の中央の黒い部分に合わせて少し小さめの円を描く
+    ctx.arc(cx, cy, r * 0.7, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ── その上に画像をスクリーン合成で重ねる ──
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(bh.rot);
+    
+    // スクリーン合成にすることで、画像の黒いリム（外枠）だけが消える
+    ctx.globalCompositeOperation = 'screen';
+    
+    const drawR = r * 2.4; 
+    ctx.drawImage(blackholeImg, -drawR, -drawR, drawR * 2, drawR * 2);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+// 吸込みアニメ用オブジェクト（隕石・ロケット共用）
+let suckingObjects = [];
+
+// 吸込みオブジェクトの描画
+function drawSuckingObjects(){
+  for(const s of suckingObjects){
+    if(s.scale <= 0) continue;
+    ctx.save();
+    ctx.globalAlpha = s.alpha;
+    ctx.translate(s.x, s.y);
+    ctx.rotate(s.rot);
+    ctx.scale(s.scale, s.scale);
+    if(s.type === 'debris'){
+      ctx.filter = 'brightness(1.4) contrast(1.2)';
+      if(meteoriteImg.complete && meteoriteImg.naturalWidth > 0){
+        const sz = s.origR * 2.4;
+        ctx.drawImage(meteoriteImg, -sz/2, -sz/2, sz, sz);
+      } else {
+        ctx.fillStyle = '#c2b8a8';
+        ctx.beginPath(); ctx.arc(0,0,s.origR,0,Math.PI*2); ctx.fill();
+      }
+    } else if(s.type === 'rocket'){
+      if(rocketImg.complete && rocketImg.naturalWidth > 0){
+        ctx.drawImage(rocketImg, -29, -61, 58, 95);
+      } else {
+        ctx.fillStyle = '#dde8f0'; ctx.fillRect(-13,-36,26,56);
+      }
+    } else if(s.type === 'astronaut'){
+      if(astronautImg.complete && astronautImg.naturalWidth > 0){
+        ctx.drawImage(astronautImg, -28, -28, 56, 56);
+      } else {
+        ctx.fillStyle = '#f0faff';
+        ctx.beginPath(); ctx.arc(0, -8, 10, 0, Math.PI*2); ctx.fill();
+        ctx.fillRect(-8, -2, 16, 18);
+      }
+    }
+    ctx.restore();
+  }
+}
+
+function updateBlackholes(dt){
+  // ブラックホールはミッション５から出現、同時に1つまで、1ミッションで複数回OK
+  const bhAliveNow = blackholes.some(bh => bh.alive);
+  if(!bhAliveNow && state === 'playing' && st().id >= 5){
+    // ミッションが進むほど出現頻度を上げる（id5→長い, id7→短い）
+    const stageId = st().id; // 5〜7
+    blackholeSpawnTimer -= dt;
+    if(blackholeSpawnTimer <= 0){
+      spawnBlackhole();
+      // 次の出現までの待機時間：ステージが進むほど短く
+      const baseMin = Math.max(20, 35 - (stageId - 5) * 7);  // 5→35, 6→28, 7→21
+      const baseRng = Math.max(10, 20 - (stageId - 5) * 4);  // 5→20, 6→16, 7→12
+      blackholeSpawnTimer = baseMin + Math.random() * baseRng;
+    }
+  }
+  
+  for(const bh of blackholes){
+    if(!bh.alive) continue;
+    bh.rot += bh.rotV;
+    bh.phaseTimer += dt;
+
+    if(bh.phase === 'grow'){
+      const t = Math.min(1, bh.phaseTimer / bh.growDur);
+      bh.r = bh.maxR * (t * t);
+      if(bh.phaseTimer >= bh.growDur){
+        bh.phase = 'wander';
+        bh.phaseTimer = 0;
+        bh.r = bh.maxR;
+      }
+    } else if(bh.phase === 'wander'){
+      bh.wanderTimer += dt;
+      if(bh.wanderTimer > 3.0 + Math.random()*2.0){
+        bh.wanderVX = (Math.random()-0.5)*0.5;
+        bh.wanderVY = (Math.random()-0.5)*0.3;
+        bh.wanderTimer = 0;
+      }
+      bh.x += bh.wanderVX;
+      bh.y += bh.wanderVY;
+      
+      // 移動制限範囲もロケットのレベル（画面下半分）に合わせて調整
+      if(bh.x < bh.r*1.5){ bh.x = bh.r*1.5; bh.wanderVX = Math.abs(bh.wanderVX); }
+      if(bh.x > W-bh.r*1.5){ bh.x = W-bh.r*1.5; bh.wanderVX = -Math.abs(bh.wanderVX); }
+      // 上限を H*0.5、下限を H*0.85 (ロケット付近) に設定
+      if(bh.y < H*0.50){ bh.y = H*0.50; bh.wanderVY = Math.abs(bh.wanderVY); }
+      if(bh.y > H*0.85){ bh.y = H*0.85; bh.wanderVY = -Math.abs(bh.wanderVY); }
+
+      if(bh.phaseTimer >= bh.wanderDur){
+        bh.phase = 'shrink';
+        bh.phaseTimer = 0;
+      }
+    } else if(bh.phase === 'shrink'){
+      const t = Math.min(1, bh.phaseTimer / bh.shrinkDur);
+      bh.r = bh.maxR * (1 - t * t);
+      if(bh.r < 1){ bh.alive = false; }
+    }
+  }
+
+  // 吸込みアニメ更新（螺旋軌道でくるくる吸い込まれる）
+  for(const s of suckingObjects){
+    const dx = s.bhX - s.x, dy = s.bhY - s.y;
+    const dist = Math.sqrt(dx*dx+dy*dy) || 1;
+    // 中心方向の引力
+    const pullSpd = (1 - s.scale) * 12 + 3;
+    // 接線方向の回転力（螺旋を作る）
+    const perpX = -dy / dist, perpY = dx / dist;
+    const swirlSpd = pullSpd * 1.4;
+    s.x += dx/dist * pullSpd + perpX * swirlSpd;
+    s.y += dy/dist * pullSpd + perpY * swirlSpd;
+    // 近づくほど高速回転
+    s.rot += 0.18 + (1 - s.scale) * 0.55;
+    s.scale = Math.max(0, s.scale - dt * 1.0);
+    s.alpha = Math.min(1, s.scale * 1.5);
+  }
+  suckingObjects = suckingObjects.filter(s => s.scale > 0);
+
+  // ブラックホールが1つ以上生きていればループ音ON、なければOFF
+  const bhAlive = blackholes.some(bh => bh.alive);
+  if (bhAlive) {
+    startBlackholeLoopSound();
+  } else {
+    stopBlackholeLoopSound();
+  }
+}
+
+function checkBlackholeCollisions(dt){
+  for(const bh of blackholes){
+    if(!bh.alive) continue;
+    const pullR2 = bh.pullR * bh.pullR;
+
+    // ── 隕石：螺旋引き込み ──
+    for(const d of debris){
+      if(!d.alive) continue;
+      const dx = bh.x - d.x, dy = bh.y - d.y;
+      const dist2 = dx*dx + dy*dy;
+      if(dist2 < pullR2){
+        const dist = Math.sqrt(dist2) || 1;
+        const force = 18 / dist;
+        const perpX = -dy/dist, perpY = dx/dist;
+        d.vx += (dx/dist * force + perpX * force * 0.5) * 0.65;
+        d.vy += (dy/dist * force + perpY * force * 0.5) * 0.65;
+        if(dist < bh.r * 1.1){
+          d.alive = false;
+          suckingObjects.push({
+            x:d.x, y:d.y, bhX:bh.x, bhY:bh.y,
+            rot:d.rot, origR:d.r, scale:1.0, alpha:1.0, type:'debris'
+          });
+        }
+      }
+    }
+
+    // ── 宇宙飛行士：隕石と同様に螺旋吸込み ──
+    for(const a of astronauts){
+      if(!a.alive || a.mode === 'being_pulled') continue;
+      const dx = bh.x - a.x, dy = bh.y - a.y;
+      const dist2 = dx*dx + dy*dy;
+      if(dist2 < pullR2){
+        const dist = Math.sqrt(dist2) || 1;
+        const force = 14 / dist;
+        const perpX = -dy/dist, perpY = dx/dist;
+        a.vx += (dx/dist * force + perpX * force * 0.5) * 0.55;
+        a.vy += (dy/dist * force + perpY * force * 0.5) * 0.55;
+        if(dist < bh.r * 1.2){
+          a.alive = false;
+          suckingObjects.push({
+            x:a.x, y:a.y, bhX:bh.x, bhY:bh.y,
+            rot:a.rot, origR:30, scale:1.0, alpha:1.0, type:'astronaut'
+          });
+        }
+      }
+    }
+
+    // ── UFO：引力だけ受けて逃げ切る（吸込みはなし） ──
+    for(const u of ufos){
+      const dx = bh.x - u.x, dy = bh.y - u.y;
+      const dist2 = dx*dx + dy*dy;
+      if(dist2 < pullR2){
+        const dist = Math.sqrt(dist2) || 1;
+        const force = 10 / dist;
+        // 引力は受けるが接線方向への逃げ力も加えて振り切る
+        const perpX = -dy/dist, perpY = dx/dist;
+        u.vx = (u.vx||0) + (dx/dist * force - perpX * force * 0.9) * 0.5;
+        u.vy = (u.vy||0) + (dy/dist * force - perpY * force * 0.9) * 0.5;
+        // UFOの速度を直接位置に反映（モードに関わらず押し流す）
+        u.x += (u.vx||0) * 0.08;
+        u.y += (u.vy||0) * 0.08;
+        u.vx = (u.vx||0) * 0.85;
+        u.vy = (u.vy||0) * 0.85;
+        // 近づきすぎたら強制離脱
+        if(dist < bh.r * 1.8){
+          u.x -= dx/dist * 4;
+          u.y -= dy/dist * 4;
+          u.mode = 'depart';
+        }
+      }
+    }
+
+    // ── ロケット：引力圏の内外を問わず、BH存在中は常に引力と振動が発生 ──
+    if(state === 'playing'){
+      const rx = rocketX, ry = H - 90;
+      const dx = bh.x - rx, dy = bh.y - ry;
+      const dist = Math.max(20, Math.sqrt(dx*dx + dy*dy));
+      const dirX = dx / dist; // BH方向（+1=右, -1=左）
+
+      // 成長度（grow中は弱め）
+      const growFactor = bh.phase === 'grow'
+        ? Math.min(1, bh.phaseTimer / bh.growDur)
+        : bh.phase === 'shrink'
+          ? Math.max(0, 1 - bh.phaseTimer / bh.shrinkDur)
+          : 1.0;
+
+      // 引力：距離に反比例、画面内どこにいても最低限効く
+      const pullStrength = Math.min(4.0, 120 / dist) * growFactor;
+      // rocketX に直接加算（減衰・キー操作の影響を受けない純粋な引力）
+      const pullPx = dirX * pullStrength;
+
+      // 逆噴射（BH方向と逆のキーを押している）で引力を相殺
+      const left  = keys['ArrowLeft']  || keys['a'] || keys['A'];
+      const right = keys['ArrowRight'] || keys['d'] || keys['D'];
+      const thrustingAgainst = (left && dirX > 0) || (right && dirX < 0);
+      // 逆噴射中は引力をキャンセル（現在位置を保てる）
+      if(!thrustingAgainst){
+        rocketX = Math.max(22, Math.min(W - 22, rocketX + pullPx));
+      }
+
+      // 振動：引力圏の内外を問わず常に発生（近いほど強い）、マイルドに調整
+      const distFactor = Math.min(1, 200 / dist); // 近いほど1に近い
+      const shakeMag = growFactor * (1.2 + distFactor * 2.8);
+      shakeX = (Math.random() - 0.5) * shakeMag * 2 + dirX * growFactor * 1.2;
+      shakeY = (Math.random() - 0.5) * shakeMag;
+
+      // 逆噴射中はエネルギー追加消費
+      if(thrustingAgainst){
+        energy = Math.max(0, energy - growFactor * 4.0 * dt);
+        life = Math.round(energy / ENERGY_MAX * LIFE_MAX);
+      }
+      // 引力圏内にいるだけで微量消費
+      energy = Math.max(0, energy - growFactor * 0.8 * dt);
+      life = Math.round(energy / ENERGY_MAX * LIFE_MAX);
+
+      // 本体に接触したら弾き飛ばす
+      if(dist < bh.r * 1.1){
+        hitFlash = 0.5;
+        shakeX = (Math.random()-0.5)*16; shakeY = (Math.random()-0.5)*12;
+        setTimeout(()=>{shakeX=0;shakeY=0;},250);
+        rocketVX -= dirX * 320;
+        rocketVX = Math.max(-300, Math.min(300, rocketVX));
+        energy = Math.max(0, energy - ENERGY_BH_COST * 0.5);
+        life = Math.round(energy / ENERGY_MAX * LIFE_MAX);
+      }
+    }
+  }
+}
+
+// --- 隕石スポーン ---
+function spawnDebris(){
+  let r=10+Math.random()*14;
+  const type=Math.random(), spd=st().debrisSpd;
+  let x,y,vx,vy;
+  // vy を約0.4倍に減速（ゆっくり落下）
+  if(type<0.3){       x=Math.random()*(W*0.3);   y=-r; vx=0.3+Math.random()*0.5;    vy=0.22*spd+Math.random()*0.28+speed*0.28;}
+  else if(type<0.6){  x=40+Math.random()*(W-80); y=-r; vx=(Math.random()-0.5)*0.2;   vy=0.22*spd+Math.random()*0.28+speed*0.28;}
+  else if(type<0.9){  x=W-Math.random()*(W*0.3); y=-r; vx=-(0.3+Math.random()*0.5);  vy=0.22*spd+Math.random()*0.28+speed*0.28;}
+  else{ x=40+Math.random()*(W-80); y=H+r; vx=(Math.random()-0.5)*0.4; vy=-(0.15+Math.random()*0.22); r=8+Math.random()*10; }
+  debris.push({x,y,vx,vy,r,rot:Math.random()*Math.PI*2,rotV:(Math.random()-0.5)*0.04,alive:true});
+}
+
+function spawnHeart(){
+  // 旧互換（使用せず）
+}
+
+// ハートを左右2セット同時出現（各セット4個）
+let heartSetActive = false;
+let heartSetClearTimer = 0;
+const HEART_SET_WAIT = 2.5;
+let lastMissedAnswer = null;
+let heartSpawnCount = 0; // 現ステージでのハート出現回数 // 正解ハートを逃したときの正解ラベル
+let hudProgress = 0;    // 進捗バー表示用（滑らかに補間）
+
+function spawnHeartSets(){
+  if(heartSetActive) return;
+  heartSetActive = true;
+  heartSetClearTimer = 0;
+  lastMissedAnswer = null; // 次のハート出現でリセット
+  heartSpawnCount++;
+  const vy = 0.48 + speed * 0.7;
+
+  // ステージに対応したブロックをランダムに選ぶ
+  const stageId = st().id; // 1-7
+  currentBlock = getBlockForStage(stageId);
+
+  // BGM再生（新しい心音ファイルで切り替え）
+  playBgm(currentBlock.sound);
+
+  // 1セット = 2個（左半分に1個・右半分に1個）
+  // どちらか一方がランダムで正解（黄色）
+  // labels[0] → 左側, labels[1] → 右側 （ランダムにシャッフル）
+  const shuffledLabels = [...currentBlock.labels];
+  if (Math.random() < 0.5) shuffledLabels.reverse();
+  const correctSide = shuffledLabels.indexOf(currentBlock.correct);
+  const sharedY = -20;
+
+  for(let side = 0; side < 2; side++){
+    const xMin = side === 0 ? 30  : W/2 + 20;
+    const xMax = side === 0 ? W/2 - 20 : W - 30;
+    const x = xMin + Math.random() * (xMax - xMin);
+    items.push({
+      x, y: sharedY,
+      vx: (Math.random()-0.5)*0.10, vy,
+      origVx:0, origVy:vy,
+      bumped:false, bumpT:0, alive:true,
+      isHeart:true,
+      isCorrect: (side === correctSide),
+      label: shuffledLabels[side]
+    });
+  }
+}
+
+function updateHeartSet(dt){
+  if(!heartSetActive) return;
+  const alive = items.filter(it => it.isHeart && it.alive);
+  if(alive.length === 0){
+    heartSetActive = false;
+    heartSetClearTimer = HEART_SET_WAIT;
+    stopBgm(); // 両ハートが消えたらBGM停止
+  }
+}
+
+// --- 炎パーティクル ---
+function addLaunchFlame(cx,cy){
+  for(let i=0;i<4;i++){
+    const a=Math.PI/2+(Math.random()-0.5)*0.3,s=3+Math.random()*4;
+    particles.push({x:cx+(Math.random()-0.5)*6,y:cy+14,vx:Math.cos(a)*s*0.3,vy:Math.sin(a)*s,life:1,maxLife:0.3+Math.random()*0.25,color:'#fffff0',r:2.5+Math.random()*1.5,isFlame:true,type:'core'});
+  }
+  for(let i=0;i<6;i++){
+    const sp=(Math.random()-0.5)*0.8,s=2+Math.random()*3;
+    particles.push({x:cx+(Math.random()-0.5)*10,y:cy+16,vx:sp*s,vy:2.5+Math.random()*3,life:1,maxLife:0.4+Math.random()*0.35,color:Math.random()<0.5?'#ff6600':'#ff3300',r:3+Math.random()*2,isFlame:true,type:'outer'});
+  }
+  if(Math.random()<0.5){
+    const a=(Math.random()-0.5)*1.2;
+    particles.push({x:cx+(Math.random()-0.5)*8,y:cy+18,vx:Math.sin(a)*4,vy:3+Math.random()*3,life:1,maxLife:0.2+Math.random()*0.15,color:'#ffee88',r:1.5,isFlame:true,type:'spark'});
+  }
+  if(Math.random()<0.3)
+    particles.push({x:cx+(Math.random()-0.5)*14,y:cy+24,vx:(Math.random()-0.5)*1.5,vy:1.5+Math.random()*1.5,life:1,maxLife:0.8+Math.random()*0.5,color:'rgba(180,180,200,0.18)',r:7+Math.random()*5,isFlame:false,type:'smoke'});
+}
+
+function addExhaust(cx,cy){
+  if(Math.random()<0.5)
+    particles.push({x:cx+(Math.random()-0.5)*4,y:cy+8,vx:(Math.random()-0.5)*0.5,vy:0.8+Math.random()*0.8,life:1,maxLife:0.4+Math.random()*0.3,color:'rgba(150,180,220,0.35)',isFlame:false,type:'exhaust'});
+}
+
+// 左右スラスター炎パーティクル
+function addThrusterFlame(cx,cy,dir){
+  // dir: +1=右スラスター(左移動時), -1=左スラスター(右移動時)
+  for(let i=0;i<3;i++){
+    particles.push({
+      x:cx+dir*24+(Math.random()-0.5)*3,
+      y:cy-20+(Math.random()-0.5)*12,
+      vx:dir*(2.0+Math.random()*3.0),
+      vy:(Math.random()-0.5)*0.8,
+      life:1,maxLife:0.15+Math.random()*0.12,
+      color:Math.random()<0.35?'#fffaaa':(Math.random()<0.5?'#ff9900':'#ff4400'),
+      r:2.5+Math.random()*1.5,isFlame:true,type:'thruster'
+    });
+  }
+}
+
+// --- 隕石破片パーティクル（衝突時） ---
+function addMeteorDebris(cx, cy, r) {
+  // 隕石の大きさに応じて破片の数を変える（15〜25個程度）
+  const count = 15 + Math.floor(r);
+  for(let i = 0; i < count; i++) {
+    // 隕石の表面付近から、外側に向かうランダムな角度
+    const angle = Math.random() * Math.PI * 2;
+    // 隕石の半径rの範囲内で初期位置をばらけさせる
+    const dist = Math.random() * r * 0.8;
+    // 隕石自体の色に近い、くすんだ茶色や灰色（hsl）
+    const hue = 30 + Math.random() * 15; // 30-45 (茶色系)
+    const sat = 10 + Math.random() * 20; // 10-30%
+    const light = 40 + Math.random() * 30; // 40-70%
+    
+    // パーティクルを追加
+    particles.push({
+      x: cx + Math.cos(angle) * dist,
+      y: cy + Math.sin(angle) * dist,
+      // 速度：外向きに弾け飛ぶ。衝突の衝撃感を出すため、少し速めに設定。
+      vx: Math.cos(angle) * (2.0 + Math.random() * 4.5),
+      vy: Math.sin(angle) * (2.0 + Math.random() * 4.5),
+      life: 1, // 1.0 (生存) から 0.0 (消滅) へ
+      maxLife: 0.6 + Math.random() * 0.5, // 0.6〜1.1秒程度生存
+      color: `hsl(${hue}, ${sat}%, ${light}%)`,
+      r: 1.5 + Math.random() * 2.5, // 破片の大きさ（徐々に小さくなる）
+      type: 'meteor_debris' // 新しいタイプ
+    });
+  }
+}
+
+// --- 星背景の修正（パララックス効果） ---
+function drawStars(){
+  const hue = st().bgHue;
+  ctx.fillStyle = '#000a1a'; 
+  ctx.fillRect(0, 0, W, H);
+
+  // 星雲（ネビュラ）：楕円＋ラジアルグラデーションで自然な雲状に描画
+  for(const n of NEBULAS){
+    const gy = ((n.y + starScroll * n.speed) % (H + n.ry * 2)) - n.ry;
+    ctx.save();
+    ctx.translate(n.x, gy);
+    ctx.rotate(n.rot);
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, n.rx);
+    grad.addColorStop(0,   `hsla(${hue}, 70%, 65%, ${n.a})`);
+    grad.addColorStop(0.45,`hsla(${hue+30}, 60%, 55%, ${n.a * 0.6})`);
+    grad.addColorStop(1,   `hsla(${hue}, 50%, 40%, 0)`);
+    ctx.scale(1, n.ry / n.rx);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, 0, n.rx, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  for(const s of BG_STARS){
+    const layerSpeed = s.r * 0.15;
+    const sy = (s.y + starScroll * layerSpeed) % (H + 10);
+
+    ctx.globalAlpha = s.a;
+    ctx.fillStyle = `rgb(${180 + Math.random() * 20 | 0}, ${180 + Math.random() * 20 | 0}, 255)`;
+    ctx.beginPath(); 
+    ctx.arc(s.x, sy, s.r, 0, Math.PI * 2); 
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// --- プレイ中：発射元の星を画面下部に表示（上1/3だけ） ---
+function drawOriginPlanet(){
+  ensureCanvas();
+  const s=st();
+  const fromR=160;
+  let fromCenterY = H + fromR*(2/3);
+
+  // 土星はリング込みの横長画像なので上にオフセットしてリングを見せる
+  const fromCanvas = s.getFrom();
+  if(fromCanvas && fromCanvas._isSaturn){
+    const aspect = fromCanvas.width / Math.max(fromCanvas.height, 1);
+    const ringH = fromR * 2 / aspect;
+    fromCenterY -= ringH * 0.38;
+  }
+
+  drawPlanet(W/2, fromCenterY, fromR, 0.85, s.getFrom(), s.fromColor);
+}
+
+// --- 目標天体（背景接近）：位置と見え方の再調整 ---
+function drawBgDest(){
+  const s = st();
+  const ddist = s.goal - dist;
+  if(ddist < 0) return;
+
+  const t = 1 - (ddist / s.goal);
+
+  // --- サイズの調整 ---
+  // Math.powを2.5に下げ、初期サイズ（0.05）を少し上げました
+  // これにより、スタート直後から「小さな円」として認識できるようになります
+  const easeT = Math.pow(t, 2.5); 
+  const r = (0.05 + easeT * 7.5) * 45; 
+
+  // --- 位置の調整 ---
+  // 開始位置（H * 0.12）を以前より下げて、HUDのバー（上部）と重ならないようにしました
+  // 到着時は H * 0.45 まで降りてくるので、よりダイナミックになります
+  const dy = H * 0.12 + easeT * (H * 0.45 - H * 0.12);
+  
+  bgDestLastR = r; 
+  bgDestLastY = dy;
+
+  // --- 透明度の調整 ---
+  // 最初から 40% 程度の不透明度で見えるようにして、存在感を強めました
+  const alpha = 0.4 + t * 0.6; 
+
+  drawPlanet(W/2, dy, r, alpha, s.getTo(), s.toColor);
+}
+
+// --- 発射炎エフェクト（描画） ---
+function drawLaunchFlame(cx,cy){
+  const ft=Date.now()*0.018;
+  ctx.save();
+  const gw=ctx.createRadialGradient(cx,cy+28,0,cx,cy+28,40);
+  gw.addColorStop(0,'rgba(255,120,0,0.18)'); gw.addColorStop(1,'rgba(255,60,0,0)');
+  ctx.fillStyle=gw; ctx.beginPath(); ctx.ellipse(cx,cy+28,40,50,0,0,Math.PI*2); ctx.fill();
+  ctx.globalAlpha=0.65;
+  const g1=ctx.createRadialGradient(cx,cy+20,0,cx,cy+36,26);
+  g1.addColorStop(0,'#ff6600'); g1.addColorStop(1,'rgba(255,0,0,0)');
+  ctx.fillStyle=g1; ctx.beginPath(); ctx.ellipse(cx+Math.sin(ft)*3,cy+30+Math.sin(ft*1.1)*5,11+Math.sin(ft*0.9)*2,30+Math.sin(ft)*7,0,0,Math.PI*2); ctx.fill();
+  ctx.globalAlpha=0.5;
+  const g2=ctx.createRadialGradient(cx,cy+18,0,cx,cy+32,20);
+  g2.addColorStop(0,'#ff4400'); g2.addColorStop(1,'rgba(255,80,0,0)');
+  ctx.fillStyle=g2; ctx.beginPath(); ctx.ellipse(cx+Math.sin(ft*1.3+1)*2,cy+26+Math.sin(ft*0.8+0.5)*4,8+Math.sin(ft*1.2)*2,22+Math.sin(ft*1.3)*5,0,0,Math.PI*2); ctx.fill();
+  ctx.globalAlpha=0.85;
+  const g3=ctx.createRadialGradient(cx,cy+12,1,cx,cy+20,12);
+  g3.addColorStop(0,'#ffee44'); g3.addColorStop(0.5,'#ff8800'); g3.addColorStop(1,'rgba(255,60,0,0)');
+  ctx.fillStyle=g3; ctx.beginPath(); ctx.ellipse(cx,cy+18+Math.sin(ft+2)*2,6+Math.sin(ft*1.5)*1.2,16+Math.sin(ft*1.1)*3,0,0,Math.PI*2); ctx.fill();
+  ctx.globalAlpha=0.95;
+  const g4=ctx.createRadialGradient(cx,cy+10,0,cx,cy+13,5);
+  g4.addColorStop(0,'#ffffff'); g4.addColorStop(0.6,'#ffee88'); g4.addColorStop(1,'rgba(255,200,0,0)');
+  ctx.fillStyle=g4; ctx.beginPath(); ctx.ellipse(cx,cy+11,2.5,7,0,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+// --- ロケット描画（傾き＋サイド炎） ---
+// --- 修正点1: drawRocketAt 内の全角マイナスを半角に変更 ---
+function drawRocketAt(cx,cy,showFlame,tilt){
+  if(showFlame) drawLaunchFlame(cx,cy);
+  ctx.save(); ctx.translate(cx,cy);
+  const t=tilt||0;
+  if(t) ctx.rotate(t);
+  ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
+
+  const absTilt=Math.abs(t);
+  if(absTilt>0.04){
+    const dir=t>0?-1:1; 
+    const ft=Date.now()*0.022;
+    const fLen=10+absTilt/0.62*22+Math.sin(ft)*3;
+    const fW=3+absTilt/0.62*4+Math.sin(ft*1.4)*1.2;
+    const alpha=Math.min(1,absTilt/0.08)*0.9;
+
+    ctx.globalAlpha=alpha*0.35;
+    ctx.fillStyle=`rgba(255,140,0,0.4)`;
+    // ↓ ここが修正箇所：全角の「−」を半角の「-」に変更
+    ctx.beginPath(); ctx.ellipse(dir*26,-14+Math.sin(ft)*3,fLen*0.7,fW*1.8,0,0,Math.PI*2); ctx.fill();
+
+    ctx.globalAlpha=alpha*0.9;
+    const sg=ctx.createLinearGradient(dir*20,0,dir*(20+fLen),0);
+    sg.addColorStop(0,'#ffffff');
+    sg.addColorStop(0.25,'#ffee44');
+    sg.addColorStop(0.6,'#ff6600');
+    sg.addColorStop(1,'rgba(255,0,0,0)');
+    ctx.fillStyle=sg;
+    // ↓ ここも修正箇所：全角の「−」を半角の「-」に変更
+    ctx.beginPath(); ctx.ellipse(dir*(20+fLen*0.45),-14+Math.sin(ft*1.1)*2,fLen*0.55,fW,0,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1;
+  }
+  // (以下、rocketImgの描画処理などはそのまま)
+  if(rocketImg.complete&&rocketImg.naturalWidth>0){
+    ctx.drawImage(rocketImg,-29,-61,58,95);
+  }else{
+    ctx.fillStyle='#dde8f0'; ctx.fillRect(-13,-36,26,56);
+    ctx.fillStyle='#ff4444'; ctx.beginPath(); ctx.moveTo(0,-62); ctx.lineTo(-12,-34); ctx.lineTo(12,-34); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#88ccff'; ctx.beginPath(); ctx.arc(0,-20,8,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawRocket(){ drawRocketAt(rocketX+shakeX,H-90+shakeY,false,rocketTilt); }
+
+// --- パーティクル描画 ---
+function drawParticles(){
+  for(const p of particles){
+    ctx.save();
+    // 隕石破片の描画（境界を少しボヤけさせる）
+    if(p.type==='meteor_debris'){
+      ctx.globalAlpha = p.life; // 生存時間に合わせて透明にする
+      const gr = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 1.5);
+      gr.addColorStop(0, p.color); // 中心は隕石の色
+      gr.addColorStop(1, 'rgba(0,0,0,0)'); // 外側は透明
+      ctx.fillStyle = gr;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * 1.5 * p.life, 0, Math.PI * 2); // 大きさも徐々に小さくする
+      ctx.fill();
+    }
+    else if(p.type==='smoke'){
+      ctx.globalAlpha=p.life*0.22; ctx.fillStyle=p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,(p.r||6)*(2-p.life),0,Math.PI*2); ctx.fill();
+    }else if(p.type==='core'){
+      ctx.globalAlpha=p.life*0.9;
+      const gr=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*2);
+      gr.addColorStop(0,'#ffffff'); gr.addColorStop(0.5,p.color); gr.addColorStop(1,'rgba(255,200,0,0)');
+      ctx.fillStyle=gr; ctx.beginPath(); ctx.arc(p.x,p.y,p.r*2*p.life,0,Math.PI*2); ctx.fill();
+    }else if(p.type==='spark'){
+      ctx.globalAlpha=p.life; ctx.strokeStyle=p.color; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x-p.vx*3,p.y-p.vy*3); ctx.stroke();
+    }else if(p.type==='thruster'){
+      ctx.globalAlpha=p.life*0.9;
+      const tr=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*3);
+      tr.addColorStop(0,'#ffffff'); tr.addColorStop(0.3,p.color); tr.addColorStop(1,'rgba(255,60,0,0)');
+      ctx.fillStyle=tr; ctx.beginPath(); ctx.arc(p.x,p.y,p.r*2.5*p.life,0,Math.PI*2); ctx.fill();
+    }else{
+      ctx.globalAlpha=p.life*(p.isFlame?0.85:0.5); ctx.fillStyle=p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.isFlame?4*p.life:2*p.life,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+  ctx.globalAlpha=1;
+}
+
+// --- 隕石 ---
+function drawMeteor(d){
+  ctx.save(); ctx.translate(d.x,d.y); ctx.rotate(d.rot);
+  ctx.filter='brightness(1.4) contrast(1.2)'; ctx.scale(-1,1);
+  if(meteoriteImg.complete&&meteoriteImg.naturalWidth>0){
+    const s=d.r*2.4; ctx.drawImage(meteoriteImg,-s/2,-s/2,s,s);
+  }else{
+    ctx.fillStyle='#c2b8a8'; ctx.beginPath();
+    ctx.moveTo(-d.r*0.5,-d.r*0.8); ctx.lineTo(d.r*0.4,-d.r*0.6); ctx.lineTo(d.r*0.8,0);
+    ctx.lineTo(d.r*0.5,d.r*0.7); ctx.lineTo(-d.r*0.3,d.r*0.9); ctx.lineTo(-d.r*0.9,d.r*0.3);
+    ctx.lineTo(-d.r*0.7,-d.r*0.4); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// --- ハートアイテム ---
+function drawHeartItem(it){
+  ctx.save();
+  ctx.translate(it.x, it.y);
+
+  const pulse = 0.92 + 0.08 * Math.sin(Date.now() * 0.005); // 拍動
+
+  // 背景の光（正解・不正解で色を変えない）
+  ctx.globalAlpha = 0.28 * pulse;
+  ctx.fillStyle = '#ff66aa';
+  ctx.beginPath();
+  ctx.arc(0, 0, 26, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.globalAlpha = 1;
+
+  // --- 画像描画（縦横比を維持・フィルターなし統一） ---
+  if (heartImg.complete && heartImg.naturalWidth > 0) {
+    const base = 38 * pulse;
+    const ratio = heartImg.naturalHeight / heartImg.naturalWidth;
+    const w = base;
+    const h = base * ratio;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(heartImg, -w / 2, -h / 2, w, h);
+  } 
+  // --- フォールバック（ベクターハート・色統一） ---
+  else {
+    ctx.fillStyle = '#ff3366';
+    ctx.beginPath();
+    ctx.moveTo(0, 6);
+    ctx.bezierCurveTo(-16, -6, -22, -19, -10, -22);
+    ctx.bezierCurveTo(-3, -25, 0, -19, 0, -16);
+    ctx.bezierCurveTo(0, -19, 3, -25, 10, -22);
+    ctx.bezierCurveTo(22, -19, 16, -6, 0, 6);
+    ctx.fill();
+  }
+
+  // --- ラベル表示（ハートの上・色統一） ---
+  if (it.label) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 9px sans-serif';
+    ctx.fillStyle = 'rgba(0,0,0,0.60)';
+    const textW = ctx.measureText(it.label).width + 8;
+    ctx.beginPath();
+    ctx.roundRect(-textW/2, -54, textW, 15, 4);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(it.label, 0, -43);
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+// --- HUD ---
+function drawHUD(){
+  const s=st();
+  const progress = hudProgress;
+  const MARGIN=6;
+
+  // 上部パネル
+  ctx.save();
+  ctx.fillStyle='rgba(0,0,0,0.45)';
+  ctx.beginPath(); ctx.roundRect(6,4,W-12,36,5); ctx.fill();
+  ctx.restore();
+
+  // ステージラベル
+  ctx.save();
+  ctx.fillStyle='rgba(180,220,255,0.9)'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center';
+  ctx.fillText(s.label,W/2,14);
+  ctx.restore();
+
+  // 一行: [出発] [バー] [目標]
+  const ICO=10,BAR_Y=27,BAR_H=7;
+  const LEFT_X=MARGIN+ICO*2+6, RIGHT_X=W-MARGIN-ICO*2-6;
+  const BAR_W=RIGHT_X-LEFT_X;
+  const fromX=MARGIN+ICO+2, toX=W-MARGIN-ICO-2;
+
+  // 惑星アイコン描画ヘルパー（土星はリング付き横長で描画）
+  function drawPlanetIcon(c, cx, cy, r, fallColor){
+    ctx.save(); ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
+    if(c){
+      if(c._isSaturn){
+        const aspect = c.width / Math.max(c.height,1);
+        const dh = r * 2, dw = dh * aspect;
+        ctx.drawImage(c, 0, 0, c.width, c.height, cx - dw/2, cy - dh/2, dw, dh);
+      } else {
+        ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.clip();
+        ctx.drawImage(c,0,0,c.width,c.height,cx-r,cy-r,r*2,r*2);
+      }
+    } else {
+      ctx.fillStyle=fallColor; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // 出発惑星
+  drawPlanetIcon(s.getFrom(), fromX, BAR_Y, ICO, s.fromColor);
+
+  // 目標惑星
+  drawPlanetIcon(s.getTo(), toX, BAR_Y, ICO, s.toColor);
+
+  // 進行バー
+  ctx.save();
+  ctx.fillStyle='rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.roundRect(LEFT_X,BAR_Y-BAR_H/2,BAR_W,BAR_H,3); ctx.fill();
+  const bfill=BAR_W*progress;
+  if(bfill>1){
+    const g=ctx.createLinearGradient(LEFT_X,0,LEFT_X+BAR_W,0);
+    g.addColorStop(0,'#1155cc'); g.addColorStop(0.5,'#44aaff'); g.addColorStop(1,'#aaddff');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.roundRect(LEFT_X,BAR_Y-BAR_H/2,bfill,BAR_H,3); ctx.fill();
+  }
+  ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.beginPath(); ctx.arc(Math.min(LEFT_X+bfill,LEFT_X+BAR_W),BAR_Y,3,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(150,200,255,0.2)'; ctx.lineWidth=1; ctx.beginPath(); ctx.roundRect(LEFT_X,BAR_Y-BAR_H/2,BAR_W,BAR_H,3); ctx.stroke();
+  ctx.restore();
+
+  // エネルギーバー（右下）
+  const BAR_FULL_W = 110;
+  const BAR_BH = 14;
+  const EX = W - MARGIN - BAR_FULL_W;
+  const EY = H - MARGIN - BAR_BH - 2;
+  const energyRatio = Math.max(0, Math.min(1, energy / ENERGY_MAX));
+
+  // バー背景パネル
+  ctx.save();
+  ctx.fillStyle='rgba(0,0,0,0.45)';
+  ctx.beginPath(); ctx.roundRect(EX-28, EY-4, BAR_FULL_W+32, BAR_BH+8, 5); ctx.fill();
+
+  // ラベル
+  ctx.fillStyle='rgba(180,220,255,0.85)';
+  ctx.font='bold 13px sans-serif'; ctx.textAlign='right';
+  ctx.fillText('⚡', EX-2, EY+BAR_BH-1);
+
+  // バー背景
+  ctx.fillStyle='rgba(255,255,255,0.08)';
+  ctx.beginPath(); ctx.roundRect(EX, EY, BAR_FULL_W, BAR_BH, 4); ctx.fill();
+
+  // バー本体（エネルギー残量によって色変化）
+  if(energyRatio > 0){
+    const barFillW = BAR_FULL_W * energyRatio;
+    let barColor;
+    if(energyRatio > 0.5){
+      // 緑 → 黄
+      const t2 = (energyRatio - 0.5) / 0.5;
+      const r2 = Math.round(255 * (1-t2) + 80 * t2) | 0;
+      const g2 = Math.round(220 * (1-t2) + 220 * t2) | 0;
+      barColor = `rgb(${r2},${g2},50)`;
+    } else {
+      // 黄 → 赤
+      const t2 = energyRatio / 0.5;
+      const r2 = 255;
+      const g2 = Math.round(220 * t2) | 0;
+      barColor = `rgb(${r2},${g2},30)`;
+    }
+    const eg = ctx.createLinearGradient(EX, 0, EX+barFillW, 0);
+    eg.addColorStop(0, barColor);
+    eg.addColorStop(1, '#ffffff88');
+    ctx.fillStyle = eg;
+    ctx.beginPath(); ctx.roundRect(EX, EY, barFillW, BAR_BH, 4); ctx.fill();
+
+    // 点滅演出（残り20%以下）
+    if(energyRatio < 0.2 && Math.sin(Date.now() * 0.015) > 0){
+      ctx.fillStyle='rgba(255,80,0,0.35)';
+      ctx.beginPath(); ctx.roundRect(EX, EY, barFillW, BAR_BH, 4); ctx.fill();
+    }
+  }
+
+  // バー枠線
+  ctx.strokeStyle='rgba(150,200,255,0.25)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.roundRect(EX, EY, BAR_FULL_W, BAR_BH, 4); ctx.stroke();
+
+  // パーセント表示
+  ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='bold 8px sans-serif'; ctx.textAlign='center';
+  ctx.fillText(Math.ceil(energyRatio*100)+'%', EX + BAR_FULL_W/2, EY + BAR_BH - 3);
+
+  ctx.textAlign='left';
+  ctx.restore();
+
+  // ===== ヒントコメント（左下、音出現中に表示） =====
+  if(heartSetActive && currentBlock && currentBlock.comment){
+    drawHintComment(currentBlock.comment);
+  }
+
+  // ===== 正解表示（ハートを逃したとき・次のハート出現まで） =====
+  if(!heartSetActive && lastMissedAnswer){
+    drawMissedAnswer(lastMissedAnswer);
+  }
+}
+
+// ===== ヒントコメント描画（テキストのみ）=====
+function drawHintComment(comment){
+  const MARGIN = 6;
+  const BAR_BH = 14;
+  const EY = H - MARGIN - BAR_BH - 2;
+
+  const PH = BAR_BH + 8;
+  const PY = EY - 4;
+
+  ctx.save();
+  ctx.font = 'bold 9px sans-serif';
+  const textW = ctx.measureText(comment).width;
+  const PW = textW + 30;
+  const PX = MARGIN;
+
+  // 背景パネル（グラデーション）
+  const bg = ctx.createLinearGradient(PX, PY, PX, PY + PH);
+  bg.addColorStop(0, 'rgba(0,20,50,0.88)');
+  bg.addColorStop(1, 'rgba(0,8,28,0.88)');
+  ctx.fillStyle = bg;
+  ctx.beginPath(); ctx.roundRect(PX, PY, PW, PH, 5); ctx.fill();
+
+  // シアン枠線
+  ctx.strokeStyle = 'rgba(100,200,255,0.45)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(PX, PY, PW, PH, 5); ctx.stroke();
+
+  // 上部ハイライトライン
+  ctx.strokeStyle = 'rgba(160,230,255,0.25)';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(PX+6, PY+1); ctx.lineTo(PX+PW-6, PY+1); ctx.stroke();
+
+  // 💡アイコン
+  ctx.font = 'bold 10px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('💡', PX + 4, PY + PH/2 + 4);
+
+  // コメントテキスト
+  ctx.font = 'bold 9px sans-serif';
+  ctx.fillStyle = 'rgba(180,230,255,0.95)';
+  ctx.fillText(comment, PX + 18, PY + PH/2 + 3);
+
+  ctx.restore();
+}
+
+// ===== 正解表示パネル（ミス後に表示）=====
+function drawMissedAnswer(label){
+  const MARGIN = 6;
+  const BAR_BH = 14;
+  const EY = H - MARGIN - BAR_BH - 2;
+
+  const PH = BAR_BH + 8;
+  const PY = EY - 4;
+
+  ctx.save();
+  ctx.font = 'bold 9px sans-serif';
+  const textW = ctx.measureText(label).width;
+  const PW = textW + 30;
+  const PX = MARGIN;
+
+  // 背景パネル（オレンジ系グラデーション・ヒントと区別）
+  const bg = ctx.createLinearGradient(PX, PY, PX, PY + PH);
+  bg.addColorStop(0, 'rgba(50,15,0,0.92)');
+  bg.addColorStop(1, 'rgba(30,8,0,0.92)');
+  ctx.fillStyle = bg;
+  ctx.beginPath(); ctx.roundRect(PX, PY, PW, PH, 5); ctx.fill();
+
+  // オレンジ枠線
+  ctx.strokeStyle = 'rgba(255,160,60,0.6)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(PX, PY, PW, PH, 5); ctx.stroke();
+
+  // 上部ハイライトライン
+  ctx.strokeStyle = 'rgba(255,200,100,0.25)';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(PX+6, PY+1); ctx.lineTo(PX+PW-6, PY+1); ctx.stroke();
+
+  // ✅アイコン
+  ctx.font = 'bold 10px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('✅', PX + 3, PY + PH/2 + 4);
+
+  // 正解テキスト
+  ctx.font = 'bold 9px sans-serif';
+  ctx.fillStyle = 'rgba(255,200,120,0.95)';
+  ctx.fillText(label, PX + 18, PY + PH/2 + 3);
+
+  ctx.restore();
+}
+
+// =============================================
+// ゴージャス スタート画面
+// =============================================
+let _uiTime = 0; // UI animation time accumulator
+
+function drawStartScreen() {
+  const T = _uiTime;
+
+  // 全体ダークオーバーレイ（グラデーション）
+  const bg = ctx.createRadialGradient(W/2, H*0.42, 0, W/2, H*0.42, W*0.85);
+  bg.addColorStop(0,   'rgba(10,0,40,0.82)');
+  bg.addColorStop(0.6, 'rgba(0,5,25,0.90)');
+  bg.addColorStop(1,   'rgba(0,0,10,0.95)');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // --- 上部：タイトルエリア ---
+  const titleY = H * 0.20;
+
+  // タイトル光輪
+  const glow = ctx.createRadialGradient(W/2, titleY, 0, W/2, titleY, 90);
+  glow.addColorStop(0,   `rgba(80,120,255,${0.18 + 0.08*Math.sin(T*1.8)})`);
+  glow.addColorStop(0.5, `rgba(40,80,200,${0.08 + 0.04*Math.sin(T*2.1)})`);
+  glow.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, titleY - 60, W, 120);
+
+  // タイトル：サブ
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 9px sans-serif';
+  ctx.letterSpacing = '3px';
+  ctx.fillStyle = `rgba(120,180,255,${0.7 + 0.3*Math.sin(T*1.4)})`;
+  ctx.fillText('MISSION  START', W/2, titleY - 22);
+
+  // タイトル：メイン（2行）
+  ctx.font = 'bold 26px sans-serif';
+  ctx.shadowColor = `rgba(100,160,255,${0.8 + 0.2*Math.sin(T*2.2)})`;
+  ctx.shadowBlur = 18 + 8 * Math.sin(T * 1.6);
+  const tg = ctx.createLinearGradient(W/2 - 100, 0, W/2 + 100, 0);
+  tg.addColorStop(0,   '#88ccff');
+  tg.addColorStop(0.35,'#ffffff');
+  tg.addColorStop(0.65,'#ffffff');
+  tg.addColorStop(1,   '#aabbff');
+  ctx.fillStyle = tg;
+  ctx.fillText('心音の旅', W/2, titleY + 6);
+
+  ctx.shadowBlur = 0;
+  ctx.font = '10px sans-serif';
+  ctx.fillStyle = `rgba(160,200,255,${0.6 + 0.2*Math.sin(T*1.1)})`;
+  ctx.fillText('太陽系を超え心臓星へ', W/2, titleY + 24);
+  ctx.restore();
+
+  // --- 装飾ライン ---
+  ctx.save();
+  ctx.textAlign = 'center';
+  for(let side = -1; side <= 1; side += 2){
+    const lx = W/2 + side * 70;
+    const lg = ctx.createLinearGradient(W/2, 0, lx, 0);
+    lg.addColorStop(0,   `rgba(100,160,255,${0.6 + 0.3*Math.sin(T*1.5)})`);
+    lg.addColorStop(1,   'rgba(100,160,255,0)');
+    ctx.strokeStyle = lg;
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(W/2 + side * 6, titleY + 36);
+    ctx.lineTo(lx, titleY + 36);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // --- 流れ星パーティクル（UI専用、簡易） ---
+  ctx.save();
+  for(let i = 0; i < 4; i++){
+    const phase = (T * 0.7 + i * 1.57) % (Math.PI * 2);
+    const px = (W * 0.1 + i * W * 0.25 + Math.sin(phase * 0.3) * 20) % W;
+    const py = (H * 0.05 + i * H * 0.07 + T * (14 + i * 5)) % (H * 0.55);
+    const len = 18 + i * 8;
+    const alpha = 0.3 + 0.4 * Math.abs(Math.sin(phase));
+    const sg = ctx.createLinearGradient(px, py, px - len * 0.6, py - len);
+    sg.addColorStop(0, `rgba(200,220,255,${alpha})`);
+    sg.addColorStop(1, 'rgba(200,220,255,0)');
+    ctx.strokeStyle = sg;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px - len * 0.6, py - len); ctx.stroke();
+  }
+  ctx.restore();
+
+  // --- 航路マップ ---
+  drawProgressMap(completedCount, START_MAP_OFFSET);
+
+  // --- クレジット＆免責（スタート画面のみ） ---
+  ctx.save();
+
+  // © クレジット：ボタン直下・中央揃え
+  // bottom:33% → ボタン下端はおよそ H * 0.67 付近、余白を見てY座標を設定
+  const creditY = H * 0.695;
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 7px sans-serif';
+  ctx.fillStyle = 'rgba(160,200,255,0.60)';
+  ctx.fillText('© 2026 ponde3110', W / 2, creditY);
+
+  // 免責テキスト：航路マップ枠の下・左揃え・極小
+  // 枠下端 = H - 4 - START_MAP_OFFSET = 520 - 4 - 30 = 486
+  const mapBottom = H - 4 - START_MAP_OFFSET;  // 枠の下端
+  const disclaimerTopMargin = 7;               // 枠との間隔
+  const disclaimer =
+    '心音の解釈は必ずしも一義的ではないため，本アプリに掲載された情報に基づいて生じた' +
+    'いかなる損害について一切の責任を負いかねます．音声は全て実際の心音です．' +
+    '本アプリに含まれるすべてのコンテンツは，著作権法により保護されています．';
+  ctx.font = '5.5px sans-serif';
+  ctx.fillStyle = 'rgba(120,160,210,0.40)';
+  ctx.textAlign = 'left';
+  const leftX = 8;
+  const maxLineW = W - 16;
+  const lineH = 7;
+  // 手動折り返し
+  const dLines = [];
+  let cur = '';
+  for(const ch of disclaimer){
+    const test = cur + ch;
+    if(ctx.measureText(test).width > maxLineW){ dLines.push(cur); cur = ch; }
+    else { cur = test; }
+  }
+  if(cur) dLines.push(cur);
+  // 枠下端＋余白から下向きに描画
+  dLines.forEach((l, idx) => {
+    ctx.fillText(l, leftX, mapBottom + disclaimerTopMargin + (idx + 1) * lineH);
+  });
+
+  ctx.restore();
+}
+
+// =============================================
+// ゴージャス ステージクリア画面
+// =============================================
+function drawStageClearScreen(stageIndex) {
+  const T = _uiTime;
+  const s = STAGES[stageIndex];
+  const missionTitle = s.label.split('：')[0];
+  const nextS = STAGES[stageIndex + 1];
+
+  // オーバーレイ
+  const bg = ctx.createRadialGradient(W/2, H*0.38, 0, W/2, H*0.38, W*0.9);
+  bg.addColorStop(0,   'rgba(0,20,10,0.88)');
+  bg.addColorStop(0.5, 'rgba(0,10,30,0.92)');
+  bg.addColorStop(1,   'rgba(0,0,10,0.96)');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // SUCCESS バナー背景
+  const bannerY = H * 0.13;
+  const bannerH = 70;
+  ctx.save();
+  const bannerG = ctx.createLinearGradient(0, bannerY, 0, bannerY + bannerH);
+  bannerG.addColorStop(0,   `rgba(0,60,20,${0.5 + 0.1*Math.sin(T*2)})`);
+  bannerG.addColorStop(0.5, `rgba(0,100,40,${0.35})`);
+  bannerG.addColorStop(1,   'rgba(0,20,10,0)');
+  ctx.fillStyle = bannerG;
+  ctx.fillRect(0, bannerY, W, bannerH);
+
+  // 左右の光線
+  for(let side = -1; side <= 1; side += 2){
+    const rx = W/2 + side * (30 + 40 * Math.abs(Math.sin(T * 0.9)));
+    const rg = ctx.createLinearGradient(W/2, bannerY + bannerH/2, rx, bannerY + bannerH/2);
+    rg.addColorStop(0,   `rgba(80,255,140,${0.18 + 0.08*Math.sin(T*1.8)})`);
+    rg.addColorStop(1,   'rgba(80,255,140,0)');
+    ctx.fillStyle = rg;
+    ctx.fillRect(Math.min(W/2, rx), bannerY, Math.abs(rx - W/2), bannerH);
+  }
+
+  ctx.textAlign = 'center';
+
+  // ラベル
+  ctx.font = 'bold 8px sans-serif';
+  ctx.fillStyle = `rgba(80,255,140,${0.7 + 0.25*Math.sin(T*2.5)})`;
+  ctx.fillText('✦  MISSION COMPLETE  ✦', W/2, bannerY + 18);
+
+  // ミッション名
+  ctx.font = 'bold 22px sans-serif';
+  ctx.shadowColor = `rgba(60,255,120,${0.9 + 0.1*Math.sin(T*1.8)})`;
+  ctx.shadowBlur = 14 + 6 * Math.sin(T * 2.2);
+  const mg = ctx.createLinearGradient(W/2-80, 0, W/2+80, 0);
+  mg.addColorStop(0,   '#88ffcc');
+  mg.addColorStop(0.4, '#ffffff');
+  mg.addColorStop(0.6, '#ffffff');
+  mg.addColorStop(1,   '#aaffdd');
+  ctx.fillStyle = mg;
+  ctx.fillText(missionTitle + '  成功！', W/2, bannerY + 50);
+  ctx.shadowBlur = 0;
+
+  // --- 到着した星のアイコン（大きく） ---
+  const iconY = H * 0.30;
+  const iconR2 = 36;
+  const toImg = PLANET_IMGS[stageIndex + 1]();
+  const pulse = 1 + 0.06 * Math.sin(T * 2.4);
+
+  ctx.save();
+  ctx.shadowColor = PLANET_COLORS[stageIndex + 1];
+  ctx.shadowBlur = 20 + 10 * Math.sin(T * 2.0);
+
+  // リング
+  for(let ri = 0; ri < 3; ri++){
+    const rr = iconR2 + 10 + ri * 12 + ri * 4 * Math.sin(T * 1.5 + ri);
+    const ra = (0.4 - ri * 0.1) * (0.6 + 0.4 * Math.abs(Math.sin(T * 1.2 + ri * 0.8)));
+    ctx.strokeStyle = `rgba(255,255,255,${ra})`;
+    ctx.lineWidth = 1.0 - ri * 0.2;
+    ctx.beginPath(); ctx.arc(W/2, iconY, rr, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  if(toImg && toImg.complete && toImg.naturalWidth){
+    const isSaturn = (stageIndex + 1 === 4); // 土星はindex4
+    if(isSaturn){
+      const asp = toImg.naturalWidth / Math.max(toImg.naturalHeight, 1);
+      const dh = iconR2 * pulse * 2.6; // リングごと表示
+      const dw = dh * asp;
+      ctx.drawImage(toImg, W/2 - dw/2, iconY - dh/2, dw, dh);
+    } else {
+      const r2d = iconR2 * pulse;
+      ctx.beginPath(); ctx.arc(W/2, iconY, r2d, 0, Math.PI * 2); ctx.clip();
+      const iw = toImg.naturalWidth, ih = toImg.naturalHeight;
+      const sq = Math.min(iw, ih);
+      ctx.drawImage(toImg, (iw-sq)/2, (ih-sq)/2, sq, sq, W/2-r2d, iconY-r2d, r2d*2, r2d*2);
+    }
+  } else {
+    ctx.fillStyle = PLANET_COLORS[stageIndex + 1];
+    ctx.beginPath(); ctx.arc(W/2, iconY, iconR2 * pulse, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+
+  // 到着テキスト
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.fillStyle = `rgba(200,240,255,${0.85 + 0.15*Math.sin(T*1.6)})`;
+  ctx.fillText(s.arriveText, W/2, iconY + iconR2 + 18);
+
+  // 次のミッション予告
+  if(nextS){
+    ctx.font = '9px sans-serif';
+    ctx.fillStyle = `rgba(120,180,255,${0.55 + 0.2*Math.sin(T*1.3)})`;
+    ctx.fillText('NEXT ▶  ' + nextS.label.split('：')[0], W/2, iconY + iconR2 + 33);
+  }
+  ctx.restore();
+
+  // 航路マップ（ローカル保存済みのクリア数と現在の大きい方）
+  drawProgressMap(Math.max(completedCount, stageIndex + 1));
+}
+
+// =============================================
+// ゴージャス ゲームオーバー画面
+// =============================================
+function drawGameOverScreen() {
+  const T = _uiTime;
+
+  // ── 背景：深宇宙ブラック＋青紫ネビュラ ──
+  const bg = ctx.createRadialGradient(W/2, H*0.28, 0, W/2, H*0.28, W*1.1);
+  bg.addColorStop(0,   'rgba(10,0,30,0.92)');
+  bg.addColorStop(0.5, 'rgba(4,0,18,0.95)');
+  bg.addColorStop(1,   'rgba(0,0,8,0.98)');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.textAlign = 'center';
+
+  // ══════════════════════════════════════════
+  // ブロック①：GAME OVER（サイバーネオン）
+  // ══════════════════════════════════════════
+  const goY = H * 0.22;
+
+  // 背景スキャンライン（ホログラム感）
+  for(let ly = goY - 36; ly < goY + 14; ly += 3){
+    const la = 0.04 + 0.03 * Math.sin(T * 4 + ly * 0.3);
+    ctx.fillStyle = `rgba(80,180,255,${la})`;
+    ctx.fillRect(W*0.06, ly, W*0.88, 1);
+  }
+
+  // 外枠パネル（サイバー風）
+  const panelAlpha = 0.55 + 0.15 * Math.sin(T * 1.6);
+  ctx.strokeStyle = `rgba(0,220,255,${panelAlpha})`;
+  ctx.lineWidth = 1.2;
+  // 上辺
+  ctx.beginPath();
+  ctx.moveTo(W*0.06, goY - 38); ctx.lineTo(W*0.94, goY - 38);
+  ctx.stroke();
+  // 下辺
+  ctx.beginPath();
+  ctx.moveTo(W*0.06, goY + 16); ctx.lineTo(W*0.94, goY + 16);
+  ctx.stroke();
+  // 左上コーナーマーク
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = `rgba(0,255,220,${panelAlpha})`;
+  ctx.beginPath(); ctx.moveTo(W*0.06, goY - 38); ctx.lineTo(W*0.06, goY - 28); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W*0.06, goY - 38); ctx.lineTo(W*0.14, goY - 38); ctx.stroke();
+  // 右上コーナーマーク
+  ctx.beginPath(); ctx.moveTo(W*0.94, goY - 38); ctx.lineTo(W*0.94, goY - 28); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W*0.94, goY - 38); ctx.lineTo(W*0.86, goY - 38); ctx.stroke();
+  // 左下コーナーマーク
+  ctx.beginPath(); ctx.moveTo(W*0.06, goY + 16); ctx.lineTo(W*0.06, goY + 6);  ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W*0.06, goY + 16); ctx.lineTo(W*0.14, goY + 16); ctx.stroke();
+  // 右下コーナーマーク
+  ctx.beginPath(); ctx.moveTo(W*0.94, goY + 16); ctx.lineTo(W*0.94, goY + 6);  ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W*0.94, goY + 16); ctx.lineTo(W*0.86, goY + 16); ctx.stroke();
+  ctx.lineWidth = 1;
+
+  // グリッチ：時々ランダムにXズレ
+  const glitchActive = Math.sin(T * 7.3) > 0.82;
+  const gx1 = glitchActive ? (Math.random() - 0.5) * 7 : 0;
+  const gx2 = glitchActive ? (Math.random() - 0.5) * 5 : 0;
+
+  // 広域シアンネオングロー
+  ctx.shadowColor = 'rgba(0,230,255,0.9)';
+  ctx.shadowBlur = 28;
+  ctx.font = 'bold 30px monospace';
+
+  // グリッチ層①（マゼンタ・微ズレ）
+  ctx.globalAlpha = 0.45;
+  ctx.fillStyle = '#ff44cc';
+  ctx.fillText('GAME OVER', W/2 + gx1 + 3, goY);
+
+  // グリッチ層②（シアン・微ズレ）
+  ctx.fillStyle = '#00ffee';
+  ctx.fillText('GAME OVER', W/2 + gx2 - 3, goY);
+
+  // メイン文字（白→シアングラデーション）
+  ctx.globalAlpha = 1.0;
+  ctx.shadowColor = 'rgba(0,200,255,1)';
+  ctx.shadowBlur = 18;
+  const neonGrad = ctx.createLinearGradient(W/2 - 105, 0, W/2 + 105, 0);
+  neonGrad.addColorStop(0,   '#00eeff');
+  neonGrad.addColorStop(0.3, '#aaffff');
+  neonGrad.addColorStop(0.5, '#ffffff');
+  neonGrad.addColorStop(0.7, '#aaffff');
+  neonGrad.addColorStop(1,   '#00eeff');
+  ctx.fillStyle = neonGrad;
+  ctx.fillText('GAME OVER', W/2, goY);
+  ctx.shadowBlur = 0;
+
+  // パネル下の小テキスト（緑モノスペース）
+  ctx.font = '8px monospace';
+  ctx.globalAlpha = 0.55 + 0.2 * Math.sin(T * 4.5);
+  ctx.fillStyle = '#44ffaa';
+  ctx.fillText('[ SYS:CRITICAL  ENERGY:000  STATUS:DESTROYED ]', W/2, goY + 30);
+  ctx.globalAlpha = 1.0;
+
+  // ══════════════════════════════════════════
+  // ブロック②：ロケット 大破（オレンジ炎系・別レイヤー感）
+  // ══════════════════════════════════════════
+  const fireY = H * 0.40;
+  const dangerPulse = 0.6 + 0.4 * Math.abs(Math.sin(T * 2.5));
+
+  // 炎のオーラ
+  const fireGlow = ctx.createRadialGradient(W/2, fireY, 0, W/2, fireY, 80);
+  fireGlow.addColorStop(0,   `rgba(255,120,0,${0.22 * dangerPulse})`);
+  fireGlow.addColorStop(0.6, `rgba(255,40,0,${0.10 * dangerPulse})`);
+  fireGlow.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.fillStyle = fireGlow;
+  ctx.fillRect(W/2 - 90, fireY - 50, 180, 100);
+
+  // 区切り破線
+  ctx.setLineDash([4, 5]);
+  ctx.lineWidth = 0.8;
+  ctx.strokeStyle = `rgba(255,120,40,${0.3 + 0.15 * Math.sin(T * 1.8)})`;
+  ctx.beginPath(); ctx.moveTo(W*0.15, fireY - 22); ctx.lineTo(W*0.85, fireY - 22); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 「ロケット 大破」本体
+  ctx.font = 'bold 26px sans-serif';
+  ctx.shadowColor = `rgba(255,80,0,${dangerPulse})`;
+  ctx.shadowBlur = 22 * dangerPulse;
+  const fireGrad = ctx.createLinearGradient(W/2 - 80, 0, W/2 + 80, 0);
+  fireGrad.addColorStop(0,   '#ff6600');
+  fireGrad.addColorStop(0.35,'#ffcc44');
+  fireGrad.addColorStop(0.5, '#ffffff');
+  fireGrad.addColorStop(0.65,'#ffcc44');
+  fireGrad.addColorStop(1,   '#ff6600');
+  ctx.fillStyle = fireGrad;
+  ctx.fillText('ロケット 大破', W/2, fireY);
+  ctx.shadowBlur = 0;
+
+  // 「エネルギーが尽きた…」
+  ctx.font = '10px sans-serif';
+  ctx.fillStyle = `rgba(210,160,100,${0.55 + 0.2 * Math.sin(T * 1.4)})`;
+  ctx.fillText('エネルギーが尽きた…', W/2, fireY + 20);
+
+  // 浮遊破片（炎色2種）
+  for(let i = 0; i < 8; i++){
+    const angle = (i / 8) * Math.PI * 2 + T * 0.35;
+    const r2 = 48 + 8 * Math.sin(T * 1.6 + i * 1.3);
+    const px = W/2 + Math.cos(angle) * r2;
+    const py = fireY - 4  + Math.sin(angle) * r2 * 0.32;
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(T * 1.1 + i);
+    ctx.globalAlpha = 0.28 + 0.22 * Math.sin(T * 2.2 + i);
+    ctx.fillStyle = i % 2 === 0 ? '#ff8822' : '#ffdd44';
+    const sz = 3 + (i % 3);
+    ctx.fillRect(-sz/2, -sz/2, sz, sz * 0.7);
+    ctx.restore();
+  }
+
+  ctx.restore();
+
+  // 航路マップ（ローカル保存済みのクリア数を使用）
+  drawProgressMap(completedCount);
+}
+
+function drawOverlay(t1,t2,t3){
+  ctx.fillStyle='rgba(0,5,18,0.85)'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#fff'; ctx.font='500 24px sans-serif'; ctx.textAlign='center';
+  ctx.fillText(t1,W/2,H/2-24);
+  ctx.fillStyle='#7799cc'; ctx.font='400 13px sans-serif'; ctx.fillText(t2,W/2,H/2+6);
+  ctx.textAlign='left';
+}
+
+function drawHitFlash(){
+  if(hitFlash>0){ctx.fillStyle=`rgba(255,40,0,${hitFlash*0.35})`;ctx.fillRect(0,0,W,H);}
+  if(pickupFlash>0){ctx.fillStyle=`rgba(0,220,180,${pickupFlash*0.3})`;ctx.fillRect(0,0,W,H);}
+}
+
+// --- 出発アニメーション（修正版） ---
+function drawLaunchAnim(){
+  ensureCanvas();
+  const s=st(),t=launchT;
+  // 惑星を大きく・画面下部に上1/3だけ見えるように表示
+  const fromR=Math.round(W * 0.85); // 画面幅の約85%の半径＝大きな惑星
+  // 中心Y: 惑星の上1/3が画面に見えるよう、中心をH + fromR*(2/3) あたりに固定
+  const baseY = H + fromR * (2/3);
+  // アニメ開始時は少し下から登場し、終わりに向けてゆっくり沈んでいく（出発感）
+  let fromY = baseY + fromR * 0.55 * easeIn(t); // 惑星がしっかり消えるまで沈む
+
+  // 土星はリング込みの横長画像なので、画像上部（リング含む）が画面に見えるよう中心Yを調整
+  const fromCanvas = s.getFrom();
+  if(fromCanvas && fromCanvas._isSaturn){
+    const aspect = fromCanvas.width / Math.max(fromCanvas.height, 1);
+    const drawH = fromR * 2;
+    fromY = H + drawH / 2 - drawH * 0.22 + drawH * 0.55 * easeIn(t);
+
+    // 反時計回りに少し傾けてリングを見せる
+    ctx.save();
+    ctx.translate(W/2, fromY);
+    ctx.rotate(-0.28); // 約16度反時計回り
+    const drawW = drawH * aspect;
+    ctx.globalAlpha = 1;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(fromCanvas, 0, 0, fromCanvas.width, fromCanvas.height,
+                  -drawW/2, -drawH/2, drawW, drawH);
+    ctx.restore();
+  } else {
+    drawPlanet(W/2, fromY, fromR, 1, s.getFrom(), s.fromColor);
+  }
+
+  const ry=(H-fromR*0.15-70)+(H-90-(H-fromR*0.15-70))*easeOut(t);
+  addLaunchFlame(W/2,ry+18); drawRocketAt(W/2+(Math.random()-0.5)*t*4,ry,true,0);
+  if(t<0.6){
+    const a=Math.min(1,t*5);
+    ctx.fillStyle=`rgba(255,255,255,${a})`;ctx.font='bold 18px sans-serif';ctx.textAlign='center';
+    ctx.fillText(s.launchText,W/2,H*0.38);ctx.textAlign='left';
+  }
+}
+
+// --- 到着アニメーションの修正（小さくなりながら上へ移動） ---
+function drawArriveAnim(){
+  const s = st(), t = arriveT;
+  
+  // 1. 星の描画：bgDestLastR/bgDestLastYから徐々に拡大して中央へ
+  const r = bgDestLastR + (450 - bgDestLastR) * easeIn(t);
+  const dy = bgDestLastY + (H / 2 - bgDestLastY) * easeIn(t);
+  drawPlanet(W/2, dy, r, 1, s.getTo(), s.toColor);
+
+  // 2. ロケットの描画：playing終了時の大きさ(scale=1)から縮小
+  const rocketScale = Math.max(0, 1.0 * (1 - t));
+  const alpha = Math.max(0, 1 - t * 1.2);
+  // Y座標：ロケットの通常位置(H-90)から上へ移動
+  const rocketY = (H - 90) - (t * H * 0.65);
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(W/2, rocketY);
+  ctx.scale(rocketScale, rocketScale);
+  
+  // 揺れながら進む
+  const shake = (Math.random() - 0.5) * 3;
+  drawRocketAt(shake, 0, true, 0);
+  ctx.restore();
+
+  // 3. テキスト表示
+  if(t > 0.3){
+    const a = Math.min(1, (t - 0.3) * 3);
+    ctx.fillStyle = `rgba(255,255,255,${a})`;
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(s.arriveText, W/2, H * 0.45);
+    ctx.textAlign = 'left';
+  }
+}
+
+// --- UFO ---
+function spawnUfo(){
+  const fromLeft = Math.random() < 0.5;
+  const startX = fromLeft ? -60 : W + 60;
+  const startY = -40;
+
+  const targetX = W / 2 + (Math.random() - 0.5) * 120;
+  const targetY = H * 0.25 + Math.random() * 80;
+
+  ufos.push({
+    x: startX,
+    y: startY,
+    targetX: targetX,
+    targetY: targetY,
+    vx: 0, vy: 0,
+    mode: 'approach',
+    timer: 0,
+    alive: true,
+    exploding: false,
+    explodeT: 0,
+    explodeParticles: [],
+    isCapture: false
+  });
+  playUfoAppearSE();
+}
+
+// 捕獲専用UFO（宇宙飛行士の上に降りてきてビームで取り込む）
+function spawnCaptureUfo(astronaut){
+  const startX = Math.random() < 0.5 ? -60 : W + 60;
+  const ufo = {
+    x: startX,
+    y: -40,
+    targetX: astronaut.x,
+    targetY: astronaut.y - 60,
+    vx: 0, vy: 0,
+    mode: 'approach',
+    timer: 0,
+    alive: true,
+    exploding: false,
+    explodeT: 0,
+    explodeParticles: [],
+    isCapture: true,
+    captureTarget: astronaut,
+    beamTimer: 0,
+    beamActive: false
+  };
+  ufos.push(ufo);
+  astronaut.captureUfoRef = ufo; // 相互参照
+}
+
+function drawUfo(u){
+  if(u.exploding) {
+    for(const p of u.explodeParticles){
+      ctx.save(); ctx.globalAlpha = p.life * 0.9; ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    return;
+  }
+
+  ctx.save();
+  ctx.translate(u.x, u.y);
+
+  // --- シンプルなサーチライト（hoverモード中のみ） ---
+  if(u.mode === 'hover' && !u.isCapture){
+    const pulse = 0.75 + Math.sin(Date.now() * 0.007) * 0.25;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const beam = ctx.createLinearGradient(0, 5, 0, 120);
+    beam.addColorStop(0, `rgba(100, 220, 255, ${0.22 * pulse})`);
+    beam.addColorStop(1, 'rgba(0, 120, 255, 0)');
+    ctx.fillStyle = beam;
+    ctx.beginPath();
+    ctx.moveTo(-10, 5); ctx.lineTo(10, 5);
+    ctx.lineTo(38, 120); ctx.lineTo(-38, 120);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // --- 捕獲ビーム（捕獲UFO用・同じ円錐スタイル） ---
+  if(u.isCapture && u.beamActive){
+    const target = u.captureTarget;
+    const beamLen = target ? Math.max(30, target.y - u.y + 20) : 100;
+    const spread = beamLen * 0.32;
+    const pulse = 0.75 + Math.sin(Date.now() * 0.007) * 0.25;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const beam = ctx.createLinearGradient(0, 5, 0, beamLen);
+    beam.addColorStop(0, `rgba(100, 220, 255, ${0.28 * pulse})`);
+    beam.addColorStop(1, 'rgba(0, 120, 255, 0)');
+    ctx.fillStyle = beam;
+    ctx.beginPath();
+    ctx.moveTo(-10, 5); ctx.lineTo(10, 5);
+    ctx.lineTo(spread, beamLen); ctx.lineTo(-spread, beamLen);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // UFO本体の描画
+  if(ufoImg.complete && ufoImg.naturalWidth > 0){
+    ctx.drawImage(ufoImg, -39, -25, 78, 50);
+  } else {
+    // 画像がない場合のフォールバック
+    ctx.fillStyle = '#88ddff';
+    ctx.beginPath(); ctx.ellipse(0, 0, 26, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#aaeeff';
+    ctx.beginPath(); ctx.ellipse(0, -4, 12, 6, 0, 0, Math.PI * 2); ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+function updateUfos(dt){
+
+  for(const u of ufos){
+    if(u.mode === 'approach'){
+      // 捕獲UFOは対象が死んでいたら退場
+      if(u.isCapture && u.captureTarget && !u.captureTarget.alive){
+        u.mode = 'depart'; continue;
+      }
+      // 捕獲UFOは対象の上に移動
+      if(u.isCapture && u.captureTarget){
+        u.targetX = u.captureTarget.x;
+        u.targetY = u.captureTarget.y - 60;
+      }
+      u.x += (u.targetX - u.x) * dt * 2.5;
+      u.y += (u.targetY - u.y) * dt * 2.5;
+      if(Math.abs(u.x - u.targetX) < 5 && Math.abs(u.y - u.targetY) < 5){
+        u.mode = 'hover';
+        if(u.isCapture) u.beamActive = true;
+      }
+    }
+    else if(u.mode === 'hover'){
+      u.timer += dt;
+      u.x += Math.sin(u.timer * 3) * 0.7;
+      u.y += Math.cos(u.timer * 5) * 0.4;
+
+      if(u.isCapture && u.beamActive){
+        u.beamTimer += dt;
+        const tgt = u.captureTarget;
+        // 対象が既に消えていたら退場
+        if(!tgt || !tgt.alive){ u.mode = 'depart'; continue; }
+        // 対象の上に追従
+        u.targetX = tgt.x;
+        u.targetY = tgt.y - 60;
+        // ビーム展開後2秒で宇宙飛行士を引き込み開始
+        if(u.beamTimer > 2.0 && tgt.mode !== 'being_pulled'){
+          tgt.mode = 'being_pulled';
+          tgt.captureAlpha = 1;
+          tgt.captureScale = 1;
+          tgt.captureUfoRef = u;
+        }
+        // 宇宙飛行士が消えたら退場（being_pulledで処理済みの場合もある）
+        if(!tgt.alive){ u.mode = 'depart'; continue; }
+      } else if(!u.isCapture && u.timer > 4.0){
+        u.mode = 'depart';
+      }
+    }
+    else if(u.mode === 'depart'){
+      u.vy -= dt * 700;
+      u.y += u.vy * dt;
+    }
+
+    // UFOは隕石などほかの物から影響を受けない（衝突判定なし）
+  }
+
+  ufos = ufos.filter(u => u.y > -200 && u.x > -150 && u.x < W + 150);
+
+  // UFOが1機以上画面内にいればループ音ON、いなければOFF
+  if (ufos.length > 0) {
+    startUfoLoopSound();
+  } else {
+    stopUfoLoopSound();
+  }
+}
+
+// --- 宇宙飛行士 ---
+function spawnAstronaut(){
+  // 同時に2人まで
+  if(astronauts.length >= 2) return;
+  const fromLeft = Math.random() < 0.5;
+  const sX = fromLeft ? -100 : W + 100;
+  const sY = H * 0.3 + Math.random() * (H * 0.3);
+
+  astronauts.push({
+    x: sX,
+    y: sY,
+    targetX: W * 0.2 + Math.random() * (W * 0.6),
+    targetY: H - 180 - Math.random() * 80,
+    vx: 0,
+    vy: 0,
+    side: fromLeft ? 1 : -1,
+    mode: 'enter',   // enter -> drift (永久に漂う。UFO捕獲か救助で消える)
+    timer: 0,
+    captureTimer: 25 + Math.random() * 15, // この秒数後にUFO捕獲開始
+    captureUfoId: null, // 捕獲担当UFOのref
+    beingCaptured: false,
+    captureAlpha: 1,
+    driftOffset: Math.random() * Math.PI * 2,
+    r: 30,
+    rot: Math.random() * Math.PI * 2,
+    rotV: (Math.random() < 0.5 ? 1 : -1) * (0.005 + Math.random() * 0.005),
+    alive: true
+  });
+}
+
+// SOS短音（モールス信号風の短いビープ）
+function playSosSE() {
+  try {
+    const ac = getAC();
+    const now = ac.currentTime;
+    // S・O・S（短・短・短 / 長・長・長 / 短・短・短）を小さく1回分だけ
+    const pattern = [0.07, 0.07, 0.07]; // 「S」の3短音だけ
+    pattern.forEach((dur, i) => {
+      const t = now + i * 0.14;
+      const osc = ac.createOscillator();
+      const g = ac.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.04, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      osc.connect(g); g.connect(ac.destination);
+      osc.start(t); osc.stop(t + dur + 0.02);
+    });
+  } catch(e) {}
+}
+
+function drawAstronaut(a){
+  if(!a.alive) return;
+
+  ctx.save();
+  ctx.globalAlpha = a.captureAlpha !== undefined ? a.captureAlpha : 1;
+  ctx.shadowBlur = 15;
+  ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
+
+  ctx.translate(a.x, a.y);
+  const sc = (a.captureScale !== undefined && a.captureScale < 1) ? a.captureScale : 1;
+  if(sc < 1) ctx.scale(sc, sc);
+
+  // SOSメッセージ（捕獲中は非表示）
+  if(a.mode !== 'being_pulled'){
+    const blink = Math.sin(Date.now() * 0.004) > 0;
+    if(blink){
+      ctx.save();
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = '#ff0';
+      ctx.fillStyle = '#fff9ba';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('SOS', 0, -45);
+      ctx.restore();
+    }
+  }
+
+  ctx.rotate(a.rot);
+
+  const drawSize = 65;
+  if(astronautImg.complete && astronautImg.naturalWidth > 0){
+    ctx.drawImage(astronautImg, -drawSize/2, -drawSize/2, drawSize, drawSize);
+  } else {
+    const s = 2.4;
+    ctx.fillStyle = '#f0faff';
+    ctx.beginPath(); ctx.arc(0, -8*s, 6*s, 0, Math.PI * 2); ctx.fill();
+    ctx.fillRect(-5*s, -3*s, 10*s, 12*s);
+  }
+  ctx.restore();
+}
+
+function updateAstronauts(dt){
+  if(!dt) return;
+  // 宇宙飛行士はミッション３から出現
+  if(st().id >= 3){
+    astronautSpawnTimer -= dt;
+    if(astronautSpawnTimer <= 0){
+      spawnAstronaut();
+      astronautSpawnTimer = 35 + Math.random() * 20;
+    }
+  }
+
+  for(const a of astronauts){
+    if(!a.alive) continue;
+
+    a.timer += dt;
+    a.rot += a.rotV;
+
+    // 衝突速度を位置に反映・減衰
+    if(a.vx || a.vy){
+      a.x += a.vx * dt * 60;
+      a.y += a.vy * dt * 60;
+      a.vx *= Math.pow(0.85, dt * 60);
+      a.vy *= Math.pow(0.85, dt * 60);
+      if(Math.abs(a.vx) < 0.01) a.vx = 0;
+      if(Math.abs(a.vy) < 0.01) a.vy = 0;
+    }
+
+    if(a.mode === 'enter'){
+      a.x += (a.targetX - a.x) * dt * 0.5;
+      a.y += (a.targetY - a.y) * dt * 0.5;
+      if(Math.abs(a.x - a.targetX) < 5) a.mode = 'drift';
+    }
+    else if(a.mode === 'drift'){
+      a.x += Math.sin(a.timer * 0.5 + a.driftOffset) * 0.3;
+      a.y += Math.cos(a.timer * 0.8 + a.driftOffset) * 0.2;
+
+      // SOS音：約2.5秒ごとに1回鳴らす
+      if(!a.sosTimer) a.sosTimer = 1.0 + Math.random(); // 初回は少しずらす
+      a.sosTimer -= dt;
+      if(a.sosTimer <= 0){
+        playSosSE();
+        a.sosTimer = 2.5 + Math.random() * 0.5;
+      }
+
+      // 捕獲タイマーが来たらUFO召喚
+      if(!a.beingCaptured && a.timer > a.captureTimer){
+        a.beingCaptured = true;
+        spawnCaptureUfo(a);
+      }
+    }
+    // being_pulled: UFOに向かって縮みながら吸い込まれる
+    else if(a.mode === 'being_pulled'){
+      const ufo = a.captureUfoRef;
+      const targetX = ufo ? ufo.x : a.x;
+      const targetY = ufo ? ufo.y + 10 : a.y - 60;
+      // UFOの位置に向かって引き寄せる
+      a.x += (targetX - a.x) * dt * 1.5;
+      a.y += (targetY - a.y) * dt * 1.5;
+      a.captureAlpha = Math.max(0, a.captureAlpha - dt * 0.4);
+      a.captureScale = Math.max(0, (a.captureScale || 1) - dt * 0.55);
+      a.rot += 0.06;
+      if(a.captureScale <= 0.05) {
+        a.alive = false;
+        // UFOにビームを消させて立ち去らせる
+        if(ufo){ ufo.beamActive = false; ufo.mode = 'depart'; }
+      }
+    }
+  }
+
+  astronauts = astronauts.filter(a => a.alive);
+}
+
+function checkAstronautRescue(){
+  const rx = rocketX;
+  const ry = H - 90;
+  for(const a of astronauts){
+    if(!a.alive) continue;
+    const dx = a.x - rx;
+    const dy = a.y - ry;
+    if(dx*dx + dy*dy < 60 * 60){ // 大きなサイズに合わせた当たり判定
+      a.alive = false;
+      energy = Math.min(ENERGY_MAX, energy + ENERGY_RESCUE_GAIN);
+      life = Math.round(energy/ENERGY_MAX*LIFE_MAX);
+      pickupFlash = 0.5;
+      playRescueSE();
+    }
+  }
+}
+
+// --- Journey Progress Map (shown during stage_clear overlay) ---
+const PLANET_LABELS = ['地球','月','火星','木星','土星','天王星','海王星','心臓星'];
+const PLANET_GETTERS = [
+  ()=>earthCanvas, ()=>moonCanvas, ()=>marsCanvas, ()=>jupiterCanvas,
+  ()=>saturnCanvas, ()=>uranusCanvas, ()=>neptuneCanvas, ()=>goalCanvas
+];
+// 元画像（マップアイコン高解像度描画用）
+const PLANET_IMGS = [
+  ()=>earthImg, ()=>moonImg, ()=>marsImg, ()=>jupiterImg,
+  ()=>saturnImg, ()=>uranusImg, ()=>neptuneImg, ()=>goalImg
+];
+const PLANET_COLORS = ['#3a8fd4','#b0b0b0','#c1440e','#e3bb76','#dfd193','#ace5ee','#4b70dd','#ffffff'];
+
+// 航路マップのホバー中の星インデックス
+let mapHoveredStar = -1;
+
+// スタート画面での航路マップY位置オフセット（免責スペース確保のため上にずらす）
+const START_MAP_OFFSET = 30;
+
+function drawProgressMap(completedMissions, yOffset){
+  // completedMissions: 0-7, number of missions done (stageIdx after completion)
+  // yOffset: スタート画面では START_MAP_OFFSET 分上にずらす
+  const _off = yOffset || 0;
+  const mapH = 82;
+  const mapY = H - mapH - 4 - _off;
+  
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,10,30,0.85)';
+  ctx.beginPath(); ctx.roundRect(6, mapY, W - 12, mapH, 8); ctx.fill();
+  ctx.strokeStyle = 'rgba(100,160,255,0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(6, mapY, W - 12, mapH, 8); ctx.stroke();
+
+  ctx.fillStyle = 'rgba(180,220,255,0.7)';
+  ctx.font = 'bold 8px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('航路マップ', W/2, mapY + 11);
+
+  const N = 8;
+  const PAD = 18;
+  const slotW = (W - 12 - PAD * 2) / (N - 1);
+  const lineY = mapY + 38;
+  const iconR = 10;
+
+  // Draw connecting line (completed part)
+  for(let i = 0; i < N - 1; i++){
+    const x1 = 6 + PAD + i * slotW;
+    const x2 = 6 + PAD + (i + 1) * slotW;
+    ctx.beginPath();
+    ctx.lineWidth = 2;
+    if(i < completedMissions){
+      // completed segment
+      const g = ctx.createLinearGradient(x1, 0, x2, 0);
+      g.addColorStop(0, PLANET_COLORS[i]);
+      g.addColorStop(1, PLANET_COLORS[i+1]);
+      ctx.strokeStyle = g;
+    } else {
+      ctx.strokeStyle = 'rgba(100,140,200,0.2)';
+    }
+    ctx.moveTo(x1, lineY); ctx.lineTo(x2, lineY); ctx.stroke();
+  }
+
+  // Draw planets
+  for(let i = 0; i < N; i++){
+    const x = 6 + PAD + i * slotW;
+    const isGoal = (i === N - 1);
+    // 地球(i=0)は常に明瞭。それ以外はクリア済みの場合のみ明瞭
+    // isDone: i==0(地球)は常にtrue、それ以外は i <= completedMissions
+    const isDone = (i === 0) || (i <= completedMissions);
+    // isVisible: 明瞭に表示するか（クリック可能かにも連動）
+    const isVisible = isDone;
+    const img = PLANET_IMGS[i]();
+    const isSaturn = (i === 4); // 土星はリング付き横長（index=4）
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    if(!isVisible){
+      ctx.globalAlpha = 0.18;
+    }
+
+    if(img && img.complete && img.naturalWidth){
+      if(isSaturn){
+        // 土星：本体はiconRと同じサイズ、リングは少しだけはみ出す
+        const asp = img.naturalWidth / Math.max(img.naturalHeight, 1);
+        const dh = iconR * 2;
+        const dw = dh * asp;
+        ctx.drawImage(img, x - dw/2, lineY - dh/2, dw, dh);
+      } else {
+        // 正方形画像：円形クリップして描画
+        const iw = img.naturalWidth, ih = img.naturalHeight;
+        const sq = Math.min(iw, ih);
+        const sx = (iw - sq) / 2, sy = (ih - sq) / 2;
+        ctx.beginPath(); ctx.arc(x, lineY, iconR, 0, Math.PI * 2); ctx.clip();
+        ctx.drawImage(img, sx, sy, sq, sq, x - iconR, lineY - iconR, iconR * 2, iconR * 2);
+      }
+    } else {
+      ctx.fillStyle = PLANET_COLORS[i];
+      ctx.beginPath(); ctx.arc(x, lineY, iconR, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+
+    // Completed checkmark ring
+    if(isDone && !isGoal){
+      ctx.save();
+      ctx.strokeStyle = 'rgba(100,255,180,0.85)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(x, lineY, iconR + 2, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+    // 心臓星：全クリア時に緑リング（脈打つグロー付き）
+    if(isGoal && completedMissions >= N - 1){
+      const pulse = 0.7 + 0.3 * Math.abs(Math.sin(_uiTime * 2.2));
+      ctx.save();
+      ctx.shadowColor = `rgba(100,255,180,${0.7 * pulse})`;
+      ctx.shadowBlur = 6 * pulse;
+      ctx.strokeStyle = `rgba(100,255,180,${0.85 * pulse})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(x, lineY, iconR + 2, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+
+    // Hover highlight ring
+    if(i === mapHoveredStar && (state==='start'||state==='stage_clear'||state==='all_clear'||state==='over')){
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,255,180,0.95)';
+      ctx.lineWidth = 2;
+      ctx.shadowColor = 'rgba(255,255,100,0.9)';
+      ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(x, lineY, iconR + 4, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+
+    // Label
+    ctx.save();
+    ctx.fillStyle = isVisible ? 'rgba(180,220,255,0.9)' : 'rgba(100,130,180,0.3)';
+    ctx.font = `${isGoal ? 'bold ' : ''}7px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.globalAlpha = 1;
+    ctx.fillText(PLANET_LABELS[i], x, lineY + iconR + 10);
+    ctx.restore();
+  }
+
+  ctx.textAlign = 'left';
+  ctx.restore();
+}
+// ロケットの当たり判定用ポイント（ローカル座標、rocketTilt込みで変換して使う）
+// 機体形状：先端・胴体上部・胴体下・左翼・右翼
+function getRocketHitPoints(cx, cy, tilt){
+  const cos = Math.cos(tilt), sin = Math.sin(tilt);
+  const local = [
+    [0, -60],   // 先端
+    [-10, -30], // 胴体左上
+    [ 10, -30], // 胴体右上
+    [-13,  10], // 胴体左中
+    [ 13,  10], // 胴体右中
+    [-22,  28], // 左翼先端
+    [ 22,  28], // 右翼先端
+    [  0,  30], // 底中央
+  ];
+  return local.map(([lx,ly])=>[
+    cx + lx*cos - ly*sin,
+    cy + lx*sin + ly*cos
+  ]);
+}
+
+function checkCollisions(){
+  const rx=rocketX, ry=H-90;
+  const hitPoints = getRocketHitPoints(rx, ry, rocketTilt);
+  for(const d of debris){
+    if(!d.alive) continue;
+    // いずれかの判定点が隕石円内に入ったら衝突
+    const r2 = (d.r + 2) * (d.r + 2);
+    let hit = false;
+    for(const [px,py] of hitPoints){
+      const dx=d.x-px, dy=d.y-py;
+      if(dx*dx+dy*dy < r2){ hit=true; break; }
+    }
+    if(hit){
+      d.alive=false; energy=Math.max(0,energy-ENERGY_HIT_COST); life=Math.round(energy/ENERGY_MAX*LIFE_MAX); hitFlash=0.5;
+      addMeteorDebris(d.x, d.y, d.r);
+      playMeteorHitSE();
+      shakeX=(Math.random()-0.5)*12; shakeY=(Math.random()-0.5)*8;
+      setTimeout(()=>{shakeX=0;shakeY=0;},200);
+    }
+  }
+  for(const it of items){
+    if(!it.alive) continue;
+    // ハートの実描画半径（base=38の約半分）に合わせた厳密な判定
+    const heartR = 16;
+    const heartR2 = heartR * heartR;
+    // ロケットのhitPointsのいずれかがハート円内に入ったら接触
+    let hit = false;
+    for(const [px,py] of hitPoints){
+      const dx=it.x-px, dy=it.y-py;
+      if(dx*dx+dy*dy < heartR2){ hit=true; break; }
+    }
+    if(hit){
+      it.alive=false;
+      if(it.isHeart){
+        stopBgm(); // ハート取得時にBGM即停止
+        if(it.isCorrect){ energy=Math.min(ENERGY_MAX,energy+ENERGY_HEART_GAIN); life=Math.round(energy/ENERGY_MAX*LIFE_MAX); pickupFlash=0.5; playCorrectSE(); }
+        else            { energy=Math.max(0,energy-ENERGY_WRONG_COST); life=Math.round(energy/ENERGY_MAX*LIFE_MAX); hitFlash=0.4; playWrongSE(); }
+      } else {
+        pickupFlash=0.3;
+      }
+    }
+  }
+}
+function checkMissedHearts(){
+  for(const it of items){
+    if(!it.alive) continue;
+    if(it.y > H+30){
+      it.alive=false;
+      // 正解ハートを逃したらエネルギー減、不正解は何もしない
+      if(it.isHeart && it.isCorrect){ energy=Math.max(0,energy-ENERGY_MISS_COST); life=Math.round(energy/ENERGY_MAX*LIFE_MAX); hitFlash=0.3; playMissSE(); lastMissedAnswer = it.label; }
+      else if(!it.isHeart)          { energy=Math.max(0,energy-ENERGY_MISS_COST); life=Math.round(energy/ENERGY_MAX*LIFE_MAX); hitFlash=0.3; playMissSE(); }
+    }
+  }
+}
+
+// 隕石がハート・宇宙飛行士に当たると弾く（隕石はそのまま）
+function checkDebrisHitsObjects(){
+  for(const d of debris){
+    if(!d.alive) continue;
+
+    // ハートは隕石と干渉しない（軌跡変化なし）
+
+    // 宇宙飛行士を弾く
+    for(const a of astronauts){
+      if(!a.alive) continue;
+      const dx=a.x-d.x, dy=a.y-d.y;
+      const distSq=dx*dx+dy*dy;
+      const minD=d.r+a.r;
+      if(distSq<minD*minD){
+        const dist=Math.sqrt(distSq)||1;
+        const nx=dx/dist, ny=dy/dist;
+        const force=3.5+d.r*0.12;
+        // 速度として加える（スムーズな移動）
+        a.vx += nx * force;
+        a.vy += ny * force;
+        // 浮遊パターンと目標もずらす
+        a.driftOffset+=(Math.random()-0.5)*1.5;
+        if(a.mode!=='being_pulled'){
+          a.targetX = Math.max(20, Math.min(W-20, a.x + nx * 25));
+          a.targetY = Math.max(50, Math.min(H-120, a.y + ny * 20));
+        }
+      }
+    }
+  }
+}
+
+// 宇宙飛行士とハートの相互衝突
+function checkAstronautHeartCollision(){
+  // ハートは宇宙飛行士とも干渉しない
+}
+
+function loop(ts){
+  const dt=Math.min((ts-lastTime)/1000,0.05);
+  lastTime=ts;
+
+  if(state==='launch_anim'){
+    if(launchT === 0 && dt > 0) playLaunchSound();
+    launchT=Math.min(1,launchT+dt/LAUNCH_DUR);
+    starScroll+=dt*30;
+    for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life-=dt/p.maxLife;}
+    particles=particles.filter(p=>p.life>0);
+    drawStars(); drawLaunchAnim(); drawParticles();
+    if(launchT>=1) state='playing';
+    requestAnimationFrame(loop); return;
+  }
+
+  // ===== 大破アニメーション =====
+  if(state === 'exploding'){
+    explosionT += dt;
+    _uiTime += dt;
+
+    // 効果音は最初の1フレームで再生
+    if(!explosionPlayed && explosionT > 0){
+      playExplosionSE();
+      explosionPlayed = true;
+    }
+
+    // 背景を描画
+    drawStars();
+
+    // ── パーティクル物理更新 ──
+    for(const p of explosionParticles){
+      if(p.delay && explosionT < p.delay) continue;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += p.grav || 0;
+      p.vx *= p.drag || 1;
+      p.vy *= p.drag || 1;
+      p.life -= dt / p.maxLife;
+      if(p.rot !== undefined) p.rot += p.rotV;
+      // 破片・火の粉のトレイル蓄積
+      if((p.isDebris || p.isEmber) && p.trail !== undefined){
+        p.trail.push({x: p.x, y: p.y});
+        if(p.trail.length > 6) p.trail.shift();
+      }
+    }
+
+    // ── 爆発コア光球（白→橙→消滅） ──
+    if(explosionT < 0.55){
+      const ct = explosionT / 0.55;
+      const coreR = (1 - ct) * 62 + ct * 12;
+      const coreA = Math.max(0, 1 - ct * 1.1);
+      ctx.save();
+      const cg = ctx.createRadialGradient(explosionX, explosionY, 0, explosionX, explosionY, coreR);
+      cg.addColorStop(0,   `rgba(255,255,240,${coreA})`);
+      cg.addColorStop(0.2, `rgba(255,240,140,${coreA * 0.9})`);
+      cg.addColorStop(0.5, `rgba(255,120,20,${coreA * 0.7})`);
+      cg.addColorStop(1,   `rgba(180,30,0,0)`);
+      ctx.fillStyle = cg;
+      ctx.beginPath(); ctx.arc(explosionX, explosionY, coreR, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+
+    // ── 衝撃波リング（2重・速度差あり） ──
+    for(const [delay, maxR, col] of [[0, W*0.7, 'rgba(255,200,100,'], [0.06, W*0.5, 'rgba(255,255,220,']]) {
+      const rt = Math.min(1, Math.max(0, (explosionT - delay) / 0.45));
+      if(rt > 0 && rt < 1){
+        const rr = rt * maxR;
+        const ra = (1 - rt) * 0.75;
+        ctx.save();
+        ctx.beginPath(); ctx.arc(explosionX, explosionY, rr, 0, Math.PI*2);
+        ctx.strokeStyle = `${col}${ra})`;
+        ctx.lineWidth = Math.max(1, (1 - rt) * 10);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // ── パーティクル描画 ──
+    for(const p of explosionParticles){
+      if(p.delay && explosionT < p.delay) continue;
+      if(p.life <= 0) continue;
+      const alpha = Math.max(0, p.life);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+
+      if(p.isSmokePuff){
+        // 膨張する煙雲
+        const growR = p.r * (1 + (1 - p.life) * 1.8);
+        const sg = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, growR);
+        sg.addColorStop(0,   p.color);
+        sg.addColorStop(0.5, p.color.replace('0.55', `${0.35 * p.life}`));
+        sg.addColorStop(1,   'rgba(0,0,0,0)');
+        ctx.fillStyle = sg;
+        ctx.beginPath(); ctx.arc(p.x, p.y, growR, 0, Math.PI*2); ctx.fill();
+      } else if(p.isSmoke){
+        // 中速煙
+        const growR = p.r * (1 + (1 - p.life) * 0.9);
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(p.x, p.y, growR, 0, Math.PI*2); ctx.fill();
+      } else if(p.isFireball){
+        // 炎球（発光グラデ）
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = p.r * 3;
+        const fg = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 2.2 * p.life);
+        fg.addColorStop(0,   '#ffffff');
+        fg.addColorStop(0.25, p.color);
+        fg.addColorStop(1,   'rgba(255,60,0,0)');
+        ctx.fillStyle = fg;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 2.2 * p.life, 0, Math.PI*2); ctx.fill();
+      } else if(p.isDebris){
+        // 金属破片（軌跡＋回転四角）
+        if(p.trail && p.trail.length > 1){
+          ctx.globalAlpha = alpha * 0.35;
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(p.trail[0].x, p.trail[0].y);
+          for(const tp of p.trail) ctx.lineTo(tp.x, tp.y);
+          ctx.stroke();
+          ctx.globalAlpha = alpha;
+        }
+        ctx.translate(p.x, p.y); ctx.rotate(p.rot || 0);
+        ctx.fillStyle = p.color;
+        ctx.shadowColor = 'rgba(255,180,80,0.5)';
+        ctx.shadowBlur = 4;
+        ctx.fillRect(-p.r*0.6, -p.r*0.35, p.r*1.2, p.r*0.7);
+      } else if(p.isEmber){
+        // 火の粉（軌跡＋先端グロー）
+        if(p.trail && p.trail.length > 1){
+          ctx.globalAlpha = alpha * 0.5;
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = p.r * 1.2;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(p.trail[0].x, p.trail[0].y);
+          for(const tp of p.trail) ctx.lineTo(tp.x, tp.y);
+          ctx.stroke();
+          ctx.globalAlpha = alpha;
+        }
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = p.r * 4;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+    }
+    explosionParticles = explosionParticles.filter(p => p.life > 0);
+
+    // ── ロケット残骸：3つに分解して飛散 ──
+    if(explosionT < 1.8){
+      const frags = [
+        { ox:-18, oy:-30, rot: explosionT * 5,   vx:-1.8, vy:-2.2, sc: Math.max(0.05, 0.7 - explosionT*0.38) },
+        { ox: 14, oy:-10, rot:-explosionT * 6.5,  vx: 2.2, vy:-1.5, sc: Math.max(0.05, 0.6 - explosionT*0.32) },
+        { ox:  0, oy: 20, rot: explosionT * 4,   vx: 0.4, vy: 2.5, sc: Math.max(0.05, 0.5 - explosionT*0.27) },
+      ];
+      for(const f of frags){
+        const alpha = Math.max(0, 1 - explosionT * 0.65);
+        if(alpha <= 0) continue;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        const fx = explosionX + f.ox + f.vx * explosionT * 60;
+        const fy = explosionY + f.oy + f.vy * explosionT * 60 + 0.5 * 0.09 * (explosionT*60)**2 * 0.01;
+        ctx.translate(fx, fy);
+        ctx.rotate(f.rot);
+        ctx.scale(f.sc, f.sc);
+        if(rocketImg && rocketImg.complete && rocketImg.naturalWidth > 0){
+          if(astronautImg.complete && astronautImg.naturalWidth > 0){
+            ctx.drawImage(astronautImg, -22, -22, 44, 44);
+          }
+        }
+        ctx.restore();
+      }
+    }
+
+    // ── 画面全体フラッシュ（冒頭の白フラッシュ） ──
+    if(explosionT < 0.12){
+      const fa = (1 - explosionT / 0.12) * 0.92;
+      ctx.fillStyle = `rgba(255,240,200,${fa})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // ── 赤みパルス（0.1〜1.2秒） ──
+    if(explosionT > 0.1 && explosionT < 1.2){
+      const pulse = Math.max(0, Math.sin(explosionT * 22) * 0.5);
+      ctx.fillStyle = `rgba(255,40,0,${pulse * 0.22})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // ── 暗転ベール（後半・煙の余韻） ──
+    if(explosionT > 1.2){
+      const darkA = Math.min(0.55, (explosionT - 1.2) * 0.38);
+      ctx.fillStyle = `rgba(8,4,2,${darkA})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // 大破演出終了 → game over 画面へ
+    if(explosionT >= EXPLOSION_DUR){
+      state = 'over';
+      _uiTime = 0;
+      launchT = 0;
+      arriveT = 0;
+    }
+
+    requestAnimationFrame(loop); return;
+  }
+
+  if(state==='arrive_anim'){
+    if(arriveT === 0 && dt > 0){ playArriveSound(); stopUfoLoopSound(); stopBlackholeLoopSound(); }
+    arriveT=Math.min(1,arriveT+dt/ARRIVE_DUR);
+    starScroll+=dt*20;
+    for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life-=dt/p.maxLife;}
+    particles=particles.filter(p=>p.life>0);
+    updateUfos(dt);
+    drawStars(); drawArriveAnim(); drawParticles();
+    if(arriveT>=1){
+      state=(stageIdx+1<STAGES.length)?'stage_clear':'all_clear';
+      _uiTime = 0;
+      // クリア済みミッション数を更新・保存
+      completedCount = Math.max(completedCount, stageIdx + 1);
+      saveCompletedCount();
+      // isAnim()がtrueを返し続けないようにリセット
+      arriveT = 0;
+      launchT = 0;
+    }
+    requestAnimationFrame(loop); return;
+  }
+
+  if(state==='playing'){
+    const s=st();
+    speed=FIXED_SPEED;
+    dist+=speed*dt*60;
+    starScroll+=speed*dt*120;
+
+    // 進捗バーをdistベースで一定速度で進める（ミッション完了で1.0）
+    { const maxHearts = s.heartCount || 6;
+      const missionDone = heartSpawnCount >= maxHearts;
+      if(missionDone){
+        hudProgress = Math.min(1, hudProgress + dt * 0.5);
+      } else {
+        hudProgress = Math.min(0.98, dist / s.goal);
+      }
+    }
+
+    const thrust=320+speed*100;
+    const left=keys['ArrowLeft']||keys['a']||keys['A'];
+    const right=keys['ArrowRight']||keys['d']||keys['D'];
+    if(left)  rocketVX-=thrust*dt;
+    if(right) rocketVX+=thrust*dt;
+    // 左右移動時のエネルギー消費
+    if(left||right) energy=Math.max(0, energy-ENERGY_MOVE_COST*dt);
+
+    // ブラックホールが近くにある場合は減衰を弱める（rocketVXへの寄与を残すため）
+    let bhNearFactor = 0;
+    for(const bh of blackholes){
+      if(!bh.alive) continue;
+      const _dx = bh.x - rocketX, _dy = bh.y - (H - 90);
+      const _d2 = _dx*_dx + _dy*_dy;
+      if(_d2 < bh.pullR * bh.pullR){
+        const _d = Math.sqrt(_d2) || 1;
+        const proximity = 1 - _d / bh.pullR;
+        if(proximity > bhNearFactor) bhNearFactor = proximity;
+      }
+    }
+    const dampBase = (left||right) ? 0.78 : 0.72;
+    const dampBH   = (left||right) ? 0.92 : 0.94;
+    const damp = dampBase + (dampBH - dampBase) * bhNearFactor;
+    rocketVX *= damp;
+    rocketVX=Math.max(-260,Math.min(260,rocketVX));
+    rocketX=Math.max(22,Math.min(W-22,rocketX+rocketVX*dt));
+
+    // 傾き強化：最大±35度、追従速度アップ
+    const targetTilt=(rocketVX/260)*0.62;
+    rocketTilt+=(targetTilt-rocketTilt)*Math.min(1,dt*9);
+
+    // スラスター炎パーティクル
+    if(left&&Math.random()<0.65)  addThrusterFlame(rocketX,H-90, 1);
+    if(right&&Math.random()<0.65) addThrusterFlame(rocketX,H-90,-1);
+
+    if(hitFlash>0)    hitFlash-=dt;
+    if(pickupFlash>0) pickupFlash-=dt;
+
+    addExhaust(rocketX,H-90+8);
+    for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life-=dt/p.maxLife;}
+    particles=particles.filter(p=>p.life>0);
+
+    for(const d of debris){d.x+=d.vx;d.y+=d.vy;d.rot+=d.rotV;}
+    debris=debris.filter(d=>d.y<H+40&&d.x<W+40&&d.alive);
+
+    // 隕石同士の衝突
+    for(let i=0;i<debris.length;i++){
+      const a=debris[i]; if(!a.alive) continue;
+      for(let j=i+1;j<debris.length;j++){
+        const b=debris[j]; if(!b.alive) continue;
+        const dx=b.x-a.x, dy=b.y-a.y;
+        const dist2=dx*dx+dy*dy;
+        const minD=a.r+b.r;
+        if(dist2<minD*minD&&dist2>0){
+          const d=Math.sqrt(dist2);
+          const nx=dx/d, ny=dy/d;
+          // 重なり解消
+          const overlap=(minD-d)*0.5;
+          a.x-=nx*overlap; a.y-=ny*overlap;
+          b.x+=nx*overlap; b.y+=ny*overlap;
+          // 速度交換（弾性衝突）
+          const dvx=a.vx-b.vx, dvy=a.vy-b.vy;
+          const dot=dvx*nx+dvy*ny;
+          if(dot>0){
+            const impulse=dot*0.85;
+            a.vx-=nx*impulse; a.vy-=ny*impulse;
+            b.vx+=nx*impulse; b.vy+=ny*impulse;
+          }
+        }
+      }
+    }
+
+    for(const it of items){
+      it.x+=it.vx; it.y+=it.vy;
+      // 弾かれた後、元の軌跡に徐々に戻す
+      if(it.bumped){
+        it.bumpT=(it.bumpT||0)+0.04;
+        const resume=Math.min(1,it.bumpT);
+        it.vx+=(it.origVx-it.vx)*0.08;
+        it.vy+=(it.origVy-it.vy)*0.08;
+        if(resume>=1&&Math.abs(it.vx-it.origVx)<0.05&&Math.abs(it.vy-it.origVy)<0.05){
+          it.vx=it.origVx; it.vy=it.origVy; it.bumped=false;
+        }
+      } else {
+        it.vx*=0.96;
+      }
+    }
+
+    // ハート同士の衝突（軽く軌道変化）
+    const HEART_R=19;
+    for(let i=0;i<items.length;i++){
+      const a=items[i]; if(!a.alive) continue;
+      for(let j=i+1;j<items.length;j++){
+        const b=items[j]; if(!b.alive) continue;
+        const dx=b.x-a.x, dy=b.y-a.y;
+        const dist2=dx*dx+dy*dy;
+        const minD=HEART_R*2;
+        if(dist2<minD*minD&&dist2>0){
+          const d=Math.sqrt(dist2);
+          const nx=dx/d, ny=dy/d;
+          const overlap=(minD-d)*0.5;
+          a.x-=nx*overlap; a.y-=ny*overlap;
+          b.x+=nx*overlap; b.y+=ny*overlap;
+          const dvx=a.vx-b.vx, dvy=a.vy-b.vy;
+          const dot=dvx*nx+dvy*ny;
+          if(dot>0){
+            const impulse=dot*0.5;
+            a.vx-=nx*impulse; a.vy-=ny*impulse;
+            b.vx+=nx*impulse; b.vy+=ny*impulse;
+          }
+          a.bumped=true; a.bumpT=0;
+          b.bumped=true; b.bumpT=0;
+        }
+      }
+    }
+
+    spawnTimer-=dt;
+    if(spawnTimer<=0){
+      const interval=Math.max(0.8,2.2-dist/3000);
+      if(!heartSetActive && heartSetClearTimer <= 0){
+        const maxHearts = st().heartCount || 6;
+        if(heartSpawnCount < maxHearts){ spawnHeartSets(); }
+      }
+      else if(Math.random()<0.45) spawnDebris();
+      spawnTimer=interval*(0.6+Math.random()*0.8);
+    }
+    checkCollisions();
+    checkMissedHearts();
+    updateHeartSet(dt);
+    if(!heartSetActive && heartSetClearTimer>0) heartSetClearTimer-=dt;
+    checkDebrisHitsObjects();
+    checkAstronautHeartCollision();
+    checkBlackholeCollisions(dt);
+    items=items.filter(it=>it.y<H+60&&it.alive);
+    updateUfos(dt);
+    updateAstronauts(dt);
+    updateBlackholes(dt);
+    checkAstronautRescue();
+
+    if(energy<=0){
+      // 大破演出を先に再生してから 'over' へ遷移
+      if(state === 'playing'){
+        state = 'exploding';
+        _uiTime = 0;
+        explosionT = 0;
+        explosionX = rocketX;
+        explosionY = H - 90;
+        explosionPlayed = false;
+        stopBgm();
+        stopUfoLoopSound();
+        stopBlackholeLoopSound();
+        spawnExplosionParticles(explosionX, explosionY);
+      }
+    }
+    { const maxHearts = s.heartCount || 6;
+      if(heartSpawnCount >= maxHearts && !heartSetActive && heartSetClearTimer <= 0){
+        state='arrive_anim'; arriveT=0; stopBgm(); stopUfoLoopSound(); stopBlackholeLoopSound();
+      }
+    }
+  }
+
+  drawStars();
+  if(state==='playing'){ drawBgDest(); }
+  for(const bh of blackholes) if(bh.alive) drawBlackhole(bh);
+  for(const d of debris) if(d.alive) drawMeteor(d);
+  drawSuckingObjects();
+  for(const a of astronauts) if(a.alive) drawAstronaut(a);
+  for(const u of ufos) drawUfo(u);
+  for(const it of items) if(it.alive) drawHeartItem(it);
+  if(state==='playing'){
+    // Rocket wobble during playing
+    rocketShakeT += 0.18;
+    const playShakeX = Math.sin(rocketShakeT * 2.3) * 0.7 + Math.sin(rocketShakeT * 5.1) * 0.3;
+    const playShakeY = Math.sin(rocketShakeT * 3.7) * 0.4;
+    drawRocketAt(rocketX + shakeX + playShakeX, H - 90 + shakeY + playShakeY, false, rocketTilt);
+  }
+  drawParticles();
+  drawHitFlash();
+  if(state==='playing') drawHUD();
+
+  // --- オーバーレイ表示（状態に応じたメッセージ）の書き換え ---
+  if (state === 'start') {
+    _uiTime += dt;
+    drawStartScreen();
+  } 
+  else if (state === 'over') {
+    _uiTime += dt;
+    drawGameOverScreen();
+  } 
+  else if (state === 'stage_clear') {
+    _uiTime += dt;
+    drawStageClearScreen(stageIdx);
+  } 
+
+  updateBtn();
+  requestAnimationFrame(loop);
+}
+
+function startStage(idx){
+  stageIdx=idx;
+  stopBgm();
+  stopUfoLoopSound();
+  stopBlackholeLoopSound();
+  currentBlock = null;
+  _uiTime = 0;
+  rocketX=W/2; rocketVX=0; rocketTilt=0; speed=FIXED_SPEED; dist=0;
+  debris=[]; items=[]; particles=[]; ufos=[]; astronauts=[]; blackholes=[]; suckingObjects=[];
+  blackholeUsed=false;
+  heartSetActive=false; heartSetClearTimer=0; lastMissedAnswer=null; heartSpawnCount=0; hudProgress=0;
+  spawnTimer=1.5; hitFlash=0; pickupFlash=0; shakeX=0; shakeY=0;
+  launchT=0; arriveT=0; bgDestLastR=0; bgDestLastY=0;
+  starScroll=0; state='launch_anim';
+  ufoSpawnTimer=8+Math.random()*10;
+  astronautSpawnTimer=30+Math.random()*25;
+  // ブラックホール初回出現タイマー：ミッションが進むほど早く出現
+  { const sid = STAGES[idx] ? STAGES[idx].id : 5;
+    const baseMin = Math.max(20, 35 - (sid - 5) * 7);
+    const baseRng = Math.max(10, 20 - (sid - 5) * 4);
+    blackholeSpawnTimer = baseMin + Math.random() * baseRng;
+  }
+  rocketShakeT=0;
+  // 大破アニメーションリセット
+  explosionT=0; explosionParticles=[]; explosionPlayed=false;
+  // ステージ開始時はエネルギーを全回復
+  energy=ENERGY_MAX;
+  life=LIFE_MAX;
+
+}
+
+function startGame(){
+  life=LIFE_MAX;
+  energy=ENERGY_MAX;
+  startStage(0);
+}
+
+// --- ここから追加 ---
+function isAnim() {
+  // 演出用タイマー変数が存在し、かつ0より大きい（動いている）場合は「真(true)」を返す
+  if (typeof launchT !== 'undefined' && launchT > 0) return true;
+  if (typeof arriveT !== 'undefined' && arriveT > 0) return true;
+  if (state === 'exploding') return true;
+  return false;
+}
+// --- ここまで追加 ---
+
+// ==========================================
+// 3. handleStart 関数の補強
+// ==========================================
+function handleStart() {
+  if(isAnim()) return;
+  // startStage に一本化（stageIdx はそのまま使う）
+  startStage(stageIdx);
+  updateBtn();
+}
+
+// =========================
+// 共通：星クリック判定関数
+// =========================
+function getClickedStage(mx, my){
+  const mapH = 82;
+  const _off = (state === 'start') ? START_MAP_OFFSET : 0;
+  const mapY = H - mapH - 4 - _off;
+  const N = 8;
+  const PAD = 18;
+  const slotW = (W - 12 - PAD * 2) / (N - 1);
+  const lineY = mapY + 38;
+  const iconR = 16;
+
+  for(let i = 0; i < N; i++){
+    const sx = 6 + PAD + i * slotW;
+    const dx = mx - sx;
+    const dy = my - lineY;
+
+    if(dx*dx + dy*dy < iconR*iconR){
+      // 地球(i=0)は常にクリック可能、それ以外はクリア済みのみ
+      const isUnlocked = (i === 0) || (i <= completedCount);
+      if(!isUnlocked) return -1;
+      // インデックス7（N-1）は心臓星（ゴール）なので、そのまま7を返す
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+// =========================
+// ステージ開始（統一）
+// =========================
+function startFromMap(stage){
+  stageIdx = stage;
+
+  // UI非表示
+  startBtn.classList.add('hidden');
+  document.getElementById('heartPlanetWrap').style.display = 'none';
+
+  // 既存の開始処理へ
+  startStage(stage);
+}
+
+// =========================
+// ホバー（そのままOK＋微修正）
+// =========================
+cv.addEventListener('mousemove', (e) => {
+  if(isAnim() || state==='playing'){
+    cv.style.cursor='default';
+    mapHoveredStar=-1;
+    return;
+  }
+
+  const rect = cv.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (W / rect.width);
+  const my = (e.clientY - rect.top) * (H / rect.height);
+
+  const stage = getClickedStage(mx, my);
+
+  mapHoveredStar = stage >= 0 ? stage : -1;
+  cv.style.cursor = stage >= 0 ? 'pointer' : 'default';
+});
+
+// =========================
+// キーボード（変更なし）
+// =========================
+document.addEventListener('keydown',e=>{
+  keys[e.key]=true;
+  if((e.key===' '||e.key==='Enter')&&!isAnim()&&state!=='playing'){
+    e.preventDefault();
+    if(state === 'stage_clear'){
+      // ミッションクリア後：ボタンと同じく次のステージへ進む
+      stageIdx++;
+      if(stageIdx < STAGES.length){
+        document.getElementById('startBtn').classList.add('hidden');
+        const hpw = document.getElementById('heartPlanetWrap');
+        if(hpw) hpw.style.display = 'none';
+        startFromMap(stageIdx);
+      } else {
+        state = 'all_clear';
+        updateBtn();
+      }
+    } else {
+      handleStart();
+    }
+  }
+  if([' ','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+});
+
+document.addEventListener('keyup',e=>{
+  keys[e.key]=false;
+});
+
+// =========================
+// タッチ開始（統一版）
+// =========================
+cv.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  if(state === 'playing') return;
+
+  const t = e.touches[0];
+  if(!t) return;
+
+  const rect = cv.getBoundingClientRect();
+  const mx = (t.clientX - rect.left) * (W / rect.width);
+  const my = (t.clientY - rect.top) * (H / rect.height);
+
+  const stage = getClickedStage(mx, my);
+
+  if(stage >= 0){
+    // インデックス7（N-1）は心臓星 → お祝いアニメーションを表示
+    if(stage === 7){
+      showCelebration();
+      return;
+    }
+    startFromMap(stage);
+    return;
+  }
+
+  // ミッションクリア画面では星以外のタッチでリセットしない
+  if(state === 'stage_clear' || state === 'all_clear') return;
+
+  handleStart();
+},{passive:false});
+
+// =========================
+// タッチ移動（変更なし）
+// =========================
+cv.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(!e.touches[0]) return;
+
+  const rect=cv.getBoundingClientRect();
+  const rx=(e.touches[0].clientX-rect.left)/rect.width*W;
+
+  keys['ArrowLeft']=rx<W/2;
+  keys['ArrowRight']=rx>=W/2;
+},{passive:false});
+
+// =========================
+// タッチ終了（変更なし）
+// =========================
+cv.addEventListener('touchend',e=>{
+  e.preventDefault();
+  keys['ArrowLeft']=false;
+  keys['ArrowRight']=false;
+},{passive:false});
+
+// =========================
+// クリック（修正版）
+// =========================
+cv.addEventListener('click', (e) => {
+  // プレイ中、またはアニメーション演出中は無視
+  if (state === 'playing' || isAnim()) return;
+  
+  const rect = cv.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (W / rect.width);
+  const my = (e.clientY - rect.top) * (H / rect.height);
+
+  // 航路マップ上のステージアイコンが押されたか判定
+  const stage = getClickedStage(mx, my);
+
+  if (stage >= 0) {
+    // インデックス7（N-1）は心臓星 → お祝いアニメーションを表示
+    if (stage === 7) {
+      showCelebration();
+      return;
+    }
+    // クリア済みのステージならそこから開始
+    startFromMap(stage);
+    return;
+  }
+
+  // ミッションクリア画面のときは、星以外のクリックでリセットされないようにガード
+  // (「ミッションへ出発」ボタンの操作を優先させるため)
+  if (state === 'stage_clear' || state === 'all_clear') return;
+
+  // どのアイコンも押されていない場合のみ、通常のスタート処理
+  // ただし、最初のスタート画面(start)やゲームオーバー(over)の時のみ動作させる
+  if (state === 'start' || state === 'over') {
+    handleStart();
+  }
+});
+
+// ==========================================
+// 1. スタートボタンのクリックイベント修正
+// ==========================================
+document.getElementById('startBtn').addEventListener('click', (e) => {
+  e.stopPropagation(); // イベントの伝播を止めて、下のキャンバスが反応しないようにする
+  
+  if (state === 'stage_clear') {
+    // ミッションクリア後の場合：次のステージへ
+    stageIdx++;
+    if (stageIdx < STAGES.length) {
+      startFromMap(stageIdx); // 次のステージを開始
+    } else {
+      state = 'all_clear';
+      updateBtn();
+    }
+  } else if (state === 'over') {
+    // ゲームオーバーの場合：同じステージを再挑戦（stageIdxはそのまま）
+    handleStart();
+  } else if (state === 'all_clear') {
+    // 全クリアの場合：最初から
+    stageIdx = 0;
+    handleStart();
+  } else {
+    // 初回スタートなどの場合
+    handleStart();
+  }
+  
+  // ボタンと演出用要素を隠す
+  document.getElementById('startBtn').classList.add('hidden');
+  const hpw = document.getElementById('heartPlanetWrap');
+  if(hpw) hpw.style.display = 'none';
+});
+
+// handleStart関数を上書きして、キーボードや画面クリックで開始した際も隠れるようにする
+const originalHandleStart = handleStart;
+handleStart = function() {
+  document.getElementById('startBtn').classList.add('hidden');
+  document.getElementById('heartPlanetWrap').style.display = 'none';
+  originalHandleStart();
+};
+
+// --- ここまで追記 ---
+
+// ===========================
+// お祝いオーバーレイ制御
+// ===========================
+const celebOverlay = document.getElementById('celebrationOverlay');
+const celebClose   = document.getElementById('celebClose');
+const celebHeart   = document.getElementById('celebHeart');
+const celebStetho  = document.getElementById('celebStetho');
+const celebFlash   = document.getElementById('mergeFlash');
+const celebFlash2  = document.getElementById('mergeFlash2');
+
+// 旅のデータ（惑星画像・色）
+const JOURNEY_DATA = [
+  { img: earthImg,   color: '#3a8fd4', isSaturn: false },
+  { img: moonImg,    color: '#b0b0b0', isSaturn: false },
+  { img: marsImg,    color: '#c1440e', isSaturn: false },
+  { img: jupiterImg, color: '#e3bb76', isSaturn: false },
+  { img: saturnImg,  color: '#dfd193', isSaturn: true  },
+  { img: uranusImg,  color: '#ace5ee', isSaturn: false },
+  { img: neptuneImg, color: '#4b70dd', isSaturn: false },
+  { img: goalImg,    color: '#ffffff', isSaturn: false },
+];
+
+// 旅の回想ベルトを構築
+function buildJourneyTrail() {
+  const trail = document.getElementById('journeyTrail');
+  trail.innerHTML = '';
+
+  JOURNEY_DATA.forEach((d, i) => {
+    // 惑星アイコン（canvas経由で円形に）
+    const oc = document.createElement('canvas');
+    if(d.isSaturn){
+      oc.width = 46; oc.height = 28;
+      oc.className = 'journey-saturn';
+      oc.style.cssText = 'width:46px;height:28px;flex-shrink:0;';
+      const c = oc.getContext('2d');
+      c.imageSmoothingEnabled = true;
+      c.imageSmoothingQuality = 'high';
+      if(d.img.complete && d.img.naturalWidth){
+        c.drawImage(d.img, 0, 0, 46, 28);
+      }
+    } else {
+      oc.width = 28; oc.height = 28;
+      oc.style.cssText = `width:28px;height:28px;flex-shrink:0;border-radius:50%;${i===7?'box-shadow:0 0 8px rgba(255,200,100,0.9);':''}`;
+      const c = oc.getContext('2d');
+      c.imageSmoothingEnabled = true;
+      c.imageSmoothingQuality = 'high';
+      c.beginPath(); c.arc(14,14,14,0,Math.PI*2); c.clip();
+      if(d.img.complete && d.img.naturalWidth){
+        const iw=d.img.naturalWidth,ih=d.img.naturalHeight;
+        const sq=Math.min(iw,ih);
+        c.drawImage(d.img,(iw-sq)/2,(ih-sq)/2,sq,sq,0,0,28,28);
+      } else {
+        c.fillStyle = d.color;
+        c.fillRect(0,0,28,28);
+      }
+    }
+    trail.appendChild(oc);
+
+    // 最後の惑星の後はラインなし
+    if(i < JOURNEY_DATA.length - 1){
+      const line = document.createElement('div');
+      line.className = 'journey-line';
+      line.style.cssText = `width:14px;height:2px;flex-shrink:0;background:linear-gradient(90deg,${d.color},${JOURNEY_DATA[i+1].color});opacity:0.55;`;
+      trail.appendChild(line);
+      // ロケットを途中に1つ挿入（地球→月の間）
+      if(i === 0){
+        const rkt = document.createElement('span');
+        rkt.className = 'journey-rocket';
+        rkt.textContent = '🚀';
+        trail.appendChild(rkt);
+        const line2 = document.createElement('div');
+        line2.className = 'journey-line';
+        line2.style.cssText = `width:14px;height:2px;flex-shrink:0;background:linear-gradient(90deg,${d.color},${JOURNEY_DATA[i+1].color});opacity:0.55;`;
+        trail.appendChild(line2);
+      }
+    }
+  });
+}
+
+// 豪華ファンファーレ（Web Audio API）
+function playFanfare() {
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+
+    // メロディー：壮大な到達感
+    const melody = [
+      {f:261.63,t:0.0, d:0.12,v:0.15},
+      {f:329.63,t:0.12,d:0.12,v:0.15},
+      {f:392.00,t:0.24,d:0.12,v:0.15},
+      {f:523.25,t:0.36,d:0.25,v:0.20},
+      {f:659.25,t:0.62,d:0.20,v:0.22},
+      {f:783.99,t:0.82,d:0.20,v:0.22},
+      {f:1046.5,t:1.02,d:0.55,v:0.28},
+      {f:783.99,t:1.02,d:0.55,v:0.18},
+      {f:1174.7,t:1.58,d:0.18,v:0.22},
+      {f:1318.5,t:1.76,d:0.90,v:0.30},
+      {f:1046.5,t:1.76,d:0.90,v:0.20},
+    ];
+    melody.forEach(({f,t,d,v})=>{
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.connect(gain); gain.connect(ac.destination);
+      osc.type = 'triangle';
+      osc.frequency.value = f;
+      gain.gain.setValueAtTime(0, ac.currentTime+t);
+      gain.gain.linearRampToValueAtTime(v, ac.currentTime+t+0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+t+d);
+      osc.start(ac.currentTime+t);
+      osc.stop(ac.currentTime+t+d+0.05);
+    });
+
+    // ベース和音
+    [[130.81,261.63],[164.81,329.63],[196.00,392.00]].forEach(([f1,f2],i)=>{
+      [f1,f2].forEach(f=>{
+        const osc=ac.createOscillator(), gain=ac.createGain();
+        osc.connect(gain); gain.connect(ac.destination);
+        osc.type='sine'; osc.frequency.value=f;
+        gain.gain.setValueAtTime(0.06,ac.currentTime+1.02);
+        gain.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+2.8);
+        osc.start(ac.currentTime+1.02);
+        osc.stop(ac.currentTime+2.85);
+      });
+    });
+
+    // 到着フラッシュ時の衝撃音（2.8秒後）
+    const boom = ac.createOscillator();
+    const boomGain = ac.createGain();
+    boom.connect(boomGain); boomGain.connect(ac.destination);
+    boom.type = 'sine'; boom.frequency.value = 80;
+    boomGain.gain.setValueAtTime(0.35, ac.currentTime+2.8);
+    boomGain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+3.3);
+    boom.start(ac.currentTime+2.8); boom.stop(ac.currentTime+3.35);
+
+  } catch(e){}
+}
+
+// 豪華紙吹雪
+function spawnConfetti(count=80) {
+  const colors = ['#ff4488','#ffcc00','#44ddff','#88ff44','#ff8844','#cc44ff','#ffffff','#ffaacc','#aaddff'];
+  for(let i = 0; i < count; i++){
+    const el = document.createElement('div');
+    el.className = 'confetti';
+    el.style.left = (Math.random() * 100) + '%';
+    el.style.top = (Math.random() * -20) + 'px';
+    el.style.background = colors[Math.floor(Math.random()*colors.length)];
+    const dur = 2.2 + Math.random() * 2.8;
+    el.style.animationDuration = dur + 's';
+    el.style.animationDelay = (Math.random() * 2.0) + 's';
+    const sz = 5 + Math.random() * 10;
+    el.style.width = sz + 'px';
+    el.style.height = (sz * (0.4 + Math.random() * 0.8)) + 'px';
+    el.style.borderRadius = Math.random() < 0.4 ? '50%' : '1px';
+    el.style.transform = `rotate(${Math.random()*360}deg)`;
+    celebOverlay.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+}
+
+// スパークル（★）をランダム配置
+function spawnSparkles(count=18) {
+  const symbols = ['✦','✧','★','✶','✸','⋆'];
+  const colors  = ['#ffe066','#ffaacc','#aaddff','#ffffff','#ffcc88'];
+  for(let i=0;i<count;i++){
+    const el=document.createElement('span');
+    el.className='sparkle';
+    el.textContent=symbols[Math.floor(Math.random()*symbols.length)];
+    el.style.left=(5+Math.random()*90)+'%';
+    el.style.top=(5+Math.random()*90)+'%';
+    el.style.color=colors[Math.floor(Math.random()*colors.length)];
+    el.style.fontSize=(10+Math.random()*18)+'px';
+    el.style.animationDuration=(0.6+Math.random()*1.2)+'s';
+    el.style.animationDelay=(Math.random()*2.0)+'s';
+    celebOverlay.appendChild(el);
+    el.addEventListener('animationend',()=>el.remove());
+  }
+}
+
+// 背景：流れ星＋星空をcanvasに描画
+let celebAnimId = null;
+function startCelebBgCanvas() {
+  const canvas = document.getElementById('celebBgCanvas');
+  const c = canvas.getContext('2d');
+  const W2 = canvas.offsetWidth || 320;
+  const H2 = canvas.offsetHeight || 520;
+  canvas.width = W2; canvas.height = H2;
+
+  // 背景星
+  const stars = Array.from({length:160},()=>({
+    x:Math.random()*W2, y:Math.random()*H2,
+    r:Math.random()*1.3+0.2,
+    a:Math.random(), speed:0.3+Math.random()*0.7,
+  }));
+  // 流れ星
+  const meteors = [];
+  function addMeteor(){
+    meteors.push({
+      x:Math.random()*W2, y:-10,
+      vx:1.5+Math.random()*2, vy:3+Math.random()*4,
+      len:40+Math.random()*60, life:1, alpha:0.9
+    });
+  }
+  let meteorTimer=0;
+
+  function drawBg(ts){
+    c.clearRect(0,0,W2,H2);
+    // 星
+    stars.forEach(s=>{
+      s.a = 0.4+0.6*Math.abs(Math.sin(ts*0.001*s.speed+s.x));
+      c.beginPath();
+      c.arc(s.x,s.y,s.r,0,Math.PI*2);
+      c.fillStyle=`rgba(255,255,255,${s.a})`;
+      c.fill();
+    });
+    // 流れ星
+    meteorTimer+=16;
+    if(meteorTimer>700){ meteorTimer=0; addMeteor(); }
+    for(let i=meteors.length-1;i>=0;i--){
+      const m=meteors[i];
+      m.x+=m.vx; m.y+=m.vy; m.life-=0.018;
+      if(m.life<=0){ meteors.splice(i,1); continue; }
+      const grd=c.createLinearGradient(m.x,m.y,m.x-m.vx/m.vy*m.len,m.y-m.len);
+      grd.addColorStop(0,`rgba(255,255,220,${m.life*0.9})`);
+      grd.addColorStop(1,'rgba(255,255,200,0)');
+      c.strokeStyle=grd; c.lineWidth=1.5;
+      c.beginPath(); c.moveTo(m.x,m.y);
+      c.lineTo(m.x-m.vx/m.vy*m.len, m.y-m.len);
+      c.stroke();
+    }
+    celebAnimId = requestAnimationFrame(drawBg);
+  }
+  if(celebAnimId) cancelAnimationFrame(celebAnimId);
+  celebAnimId = requestAnimationFrame(drawBg);
+}
+
+function stopCelebBgCanvas(){
+  if(celebAnimId){ cancelAnimationFrame(celebAnimId); celebAnimId=null; }
+}
+
+// アニメーションをリセットして再再生するユーティリティ
+function resetAnim(el) {
+  el.style.animation = 'none';
+  void el.offsetWidth;
+  el.style.animation = '';
+}
+
+function showCelebration() {
+  // リセット
+  resetAnim(celebHeart);
+  resetAnim(celebStetho);
+  resetAnim(celebFlash);
+  resetAnim(celebFlash2);
+  document.querySelectorAll('.confetti,.sparkle').forEach(e=>e.remove());
+
+  // 旅の回想ベルト構築
+  buildJourneyTrail();
+  const journeyReplay = document.getElementById('journeyReplay');
+  journeyReplay.style.animation='none';
+  void journeyReplay.offsetWidth;
+  journeyReplay.style.animation='';
+  const journeyTrail = document.getElementById('journeyTrail');
+  journeyTrail.style.animation='none';
+  void journeyTrail.offsetWidth;
+  journeyTrail.style.animation='';
+
+  const arrFlash = document.getElementById('arrivalFlash');
+  arrFlash.style.animation='none';
+  void arrFlash.offsetWidth;
+  arrFlash.style.animation='';
+
+  // mergeArea
+  document.getElementById('mergeArea').style.animation='none';
+  void document.getElementById('mergeArea').offsetWidth;
+  document.getElementById('mergeArea').style.animation='';
+
+  celebOverlay.classList.add('active');
+  startCelebBgCanvas();
+  playFanfare();
+
+  // タイムライン
+  setTimeout(()=>spawnConfetti(100), 3900);
+  setTimeout(()=>spawnConfetti(60),  4700);
+  setTimeout(()=>spawnSparkles(20),  4000);
+  setTimeout(()=>spawnSparkles(14),  5200);
+}
+
+function hideCelebration() {
+  celebOverlay.classList.remove('active');
+  stopCelebBgCanvas();
+}
+
+celebClose.addEventListener('click', (e) => {
+  e.stopPropagation();
+  hideCelebration();
+  // ゲームをリスタート
+  stageIdx = 0;
+  state = 'start';
+  document.getElementById('startBtn').classList.remove('hidden');
+  const hpw = document.getElementById('heartPlanetWrap');
+  if(hpw) hpw.style.display = '';
+  updateBtn();
+});
+
+// =============================
+// 全クリア時にお祝い表示を呼ぶ
+// =============================
+// arrive_anim が終わって all_clear になる瞬間をフック
+const _origLoop_allclear = loop;
+// arrive_animの完了検出：arriveT>=1かつstageIdx==6(最終)の時にお祝い
+// loop内のarriveT>=1処理の後でstate='all_clear'になるので、
+// updateBtn()で検出するのが確実
+let _prevState = state;
+const _origUpdateBtn = updateBtn;
+updateBtn = function() {
+  _origUpdateBtn();
+  if(state === 'all_clear' && _prevState !== 'all_clear') {
+    // 即座にお祝いオーバーレイを表示
+    showCelebration();
+  }
+  _prevState = state;
+};
+
+
+// ===== 裏タブ時の音声停止／復帰 =====
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    // BGM（Audioオブジェクト）を一時停止
+    if (currentBgm && !currentBgm.paused) {
+      currentBgm.pause();
+    }
+    // Web Audio API（UFO・ブラックホールループ）をサスペンド
+    if (_audioCtx && _audioCtx.state === 'running') {
+      _audioCtx.suspend().catch(() => {});
+    }
+  } else {
+    // 表タブに戻ったらBGMを再開
+    if (currentBgm && currentBgm.paused && currentBgmFile) {
+      currentBgm.play().catch(() => {});
+    }
+    // Web Audio APIを再開
+    if (_audioCtx && _audioCtx.state === 'suspended') {
+      _audioCtx.resume().catch(() => {});
+    }
+  }
+});
+
+lastTime=performance.now();
+requestAnimationFrame(loop);
+</script>

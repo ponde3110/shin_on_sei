@@ -681,52 +681,37 @@ const BLOCK_TYPES = [
 // 現在のハートセットに割り当てられたブロック情報
 let currentBlock = null;
 
-// ===== iOS Audio アンロック =====
-// iOSではユーザー操作のタイミングでAudioContextをresumeしないと音が出ない
+// ===== BGM / 心音管理 =====
+//
+// 【設計方針】
+//   Android / PC : new Audio() で普通に play() するだけ。確実に動く。
+//   iOS (iPhone/iPad) : 同じく new Audio() で play() するが、
+//     iOS は「ユーザー操作の外で play() を呼ぶと無視する」制約がある。
+//     対策として unlockAudio()（最初のタッチ時）に全音声ファイル分の
+//     Audio 要素をあらかじめ作り、volume=0 で play()→pause() して
+//     「再生許可済み」状態にしておく。その後 playBgm() で
+//     currentTime=0, volume=0.55 にして再び play() すれば鳴る。
+//
+//   fetch / decodeAudioData / createMediaElementSource は一切使わない。
+
 let _audioUnlocked = false;
-function unlockAudio() {
-  // iOSではユーザー操作のたびにresumeが必要なので、フラグで止めない
-  const ac = getAC();
-  if (ac.state === 'suspended') {
-    ac.resume().catch(() => {});
-  }
-  if (_audioUnlocked) return;
-  _audioUnlocked = true;
-  // iOS Safari用：無音バッファを1度再生してAudioContextをアクティブ化
-  try {
-    const buf = ac.createBuffer(1, 1, 22050);
-    const src = ac.createBufferSource();
-    src.buffer = buf;
-    src.connect(ac.destination);
-    src.start(0);
-  } catch(e) {}
-  // HTMLAudioの再生制限を解除するため、無音Audioを再生
-  const silentAudio = new Audio();
-  silentAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
-  silentAudio.volume = 0;
-  silentAudio.play().catch(() => {});
-  // 心音BGMが止まっていたら再開
-  if (currentBgmFile) {
-    if (_isIOS && !_bgmSourceNode) {
-      _playBgmWebAudio(currentBgmFile);
-    } else if (!_isIOS && currentBgm && currentBgm.paused) {
-      currentBgm.play().catch(() => {});
-    }
-  }
-}
+let currentBgm     = null;   // 現在再生中の HTMLAudioElement
+let currentBgmFile = null;   // 現在再生中のファイル名
+let heartSoundAudio = null;  // 後方互換ダミー
 
-// ===== BGM / 心音管理（HTMLAudio主体 + WebAudio iOS フォールバック）=====
-let currentBgm = null;          // 再生中の HTMLAudioElement（Android/PC）
-let currentBgmFile = null;      // 再生中のファイル名
-let heartSoundAudio = null;     // 後方互換ダミー
+// iOS 用：ファイルごとに Audio 要素をキャッシュ（unlock 済みのものを使い回す）
+const _iosAudioCache = {};
 
-// Web Audio API経由のBGM（iOS Safari 用フォールバック）
+// 後方互換ダミー（旧コードの参照が残っている箇所用）
 let _bgmSourceNode = null;
 let _bgmGainNode   = null;
-let _bgmBufferCache = {};
+const _bgmBufferCache = {};
+function _stopBgmWebAudio() {}
+function _playBgmWebAudio(f) { playBgm(f); }
 
-// iOSかどうかを判定
-const _isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+// iOS 判定（iPadOS 13+ は Macintosh UA を名乗るため maxTouchPoints で補完）
+const _isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 // ステージ番号(1-7)に対応するmissionのブロックをランダム取得
 function getBlockForStage(stageId) {
@@ -740,100 +725,91 @@ function getBlockForStage(stageId) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-// ── iOS用: Web Audio API でBGMを再生 ──
-function _playBgmWebAudio(soundFile) {
-  // 既に同じファイルが再生中なら何もしない
-  if (currentBgmFile === soundFile && _bgmSourceNode) return;
-  _stopBgmWebAudio();
-  currentBgmFile = soundFile;
-
-  const ac = getAC();
-  const doLoad = () => {
-    if (_bgmBufferCache[soundFile]) {
-      _startBgmNode(_bgmBufferCache[soundFile], soundFile);
-      return;
-    }
-    fetch('sound/' + soundFile)
-      .then(r => r.arrayBuffer())
-      .then(ab => {
-        // decodeAudioData: コールバック形式とPromise形式の両方に対応
-        const onSuccess = (buf) => {
-          _bgmBufferCache[soundFile] = buf;
-          _startBgmNode(buf, soundFile);
-        };
-        const result = ac.decodeAudioData(ab, onSuccess, () => {});
-        // Promise形式もサポートする環境ではthenを使う
-        if (result && typeof result.then === 'function') {
-          result.then(onSuccess).catch(() => {});
-        }
-      })
-      .catch(() => {});
-  };
-
-  if (ac.state === 'suspended') {
-    ac.resume().then(doLoad).catch(doLoad);
-  } else {
-    doLoad();
+// iOS 用：unlock 済み Audio 要素を取得（なければ作成）
+function _getIosAudio(soundFile) {
+  if (!_iosAudioCache[soundFile]) {
+    const a = new Audio('sound/' + soundFile);
+    a.loop = true;
+    a.volume = 0.55;
+    _iosAudioCache[soundFile] = a;
   }
+  return _iosAudioCache[soundFile];
 }
 
-function _startBgmNode(buf, soundFile) {
-  if (currentBgmFile !== soundFile) return; // 途中でstop済み
-  _stopBgmWebAudio();
-  const ac = getAC();
-  _bgmGainNode = ac.createGain();
-  _bgmGainNode.gain.value = 0.55;
-  _bgmGainNode.connect(ac.destination);
-  _bgmSourceNode = ac.createBufferSource();
-  _bgmSourceNode.buffer = buf;
-  _bgmSourceNode.loop = true;
-  _bgmSourceNode.connect(_bgmGainNode);
-  _bgmSourceNode.start(0);
-}
-
-function _stopBgmWebAudio() {
-  if (_bgmSourceNode) {
-    try { _bgmSourceNode.stop(); } catch(e) {}
-    try { _bgmSourceNode.disconnect(); } catch(e) {}
-    _bgmSourceNode = null;
+// ── unlockAudio：最初のタッチ時に呼ぶ ──
+function unlockAudio() {
+  // AudioContext は毎回 resume（iOS は操作のたびに suspended になる）
+  if (_audioCtx && _audioCtx.state === 'suspended') {
+    _audioCtx.resume().catch(() => {});
   }
-  if (_bgmGainNode) {
-    try { _bgmGainNode.disconnect(); } catch(e) {}
-    _bgmGainNode = null;
-  }
-}
+  if (_audioUnlocked) return;
+  _audioUnlocked = true;
 
-// ── メイン: BGM再生（Android/PCはHTMLAudio、iOSはWebAudio）──
-function playBgm(soundFile) {
+  // Web Audio API 起動用：無音バッファを再生して AudioContext をアクティブ化
+  try {
+    const ac = getAC();
+    const buf = ac.createBuffer(1, 1, 22050);
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    src.connect(ac.destination);
+    src.start(0);
+  } catch(e) {}
+
+  // iOS のみ：全心音ファイルの Audio 要素をここで作り、
+  // volume=0 で play()→pause() して「再生許可済み」にする。
+  // これをユーザー操作の同期コールスタック内でやることが iOS では必須。
   if (_isIOS) {
-    _playBgmWebAudio(soundFile);
-    return;
-  }
-  // Android / PC: HTMLAudio
-  if (currentBgmFile === soundFile && currentBgm && !currentBgm.paused) return;
-  stopBgm();
-  currentBgmFile = soundFile;
-  currentBgm = new Audio('sound/' + soundFile);
-  currentBgm.loop = true;
-  currentBgm.volume = 0.55;
-  const ac = getAC();
-  const doPlay = () => currentBgm.play().catch(() => {});
-  if (ac.state === 'suspended') {
-    ac.resume().then(doPlay).catch(doPlay);
-  } else {
-    doPlay();
+    const allSounds = [...new Set(BLOCK_TYPES.map(b => b.sound))];
+    allSounds.forEach(file => {
+      try {
+        const a = _getIosAudio(file);
+        a.volume = 0;
+        const p = a.play();
+        if (p && typeof p.then === 'function') {
+          p.then(() => { a.pause(); a.currentTime = 0; a.volume = 0.55; })
+           .catch(() => { a.volume = 0.55; });
+        }
+      } catch(e) {}
+    });
   }
 }
 
-function stopBgm() {
-  // HTMLAudio停止
+// ── playBgm：心音再生（全デバイス共通）──
+function playBgm(soundFile) {
+  // すでに同じファイルが再生中なら何もしない
+  if (currentBgmFile === soundFile && currentBgm && !currentBgm.paused) return;
+
+  // 再生中のものを止める
   if (currentBgm) {
     currentBgm.pause();
     currentBgm.currentTime = 0;
     currentBgm = null;
   }
-  // WebAudio停止
-  _stopBgmWebAudio();
+  currentBgmFile = soundFile;
+
+  // iOS はキャッシュ済み Audio 要素を使う、それ以外は毎回 new Audio()
+  const audio = _isIOS ? _getIosAudio(soundFile) : new Audio('sound/' + soundFile);
+  audio.loop = true;
+  audio.volume = 0.55;
+  audio.currentTime = 0;
+  currentBgm = audio;
+
+  // AudioContext が suspended なら resume してから play
+  const tryPlay = () => { audio.play().catch(() => {}); };
+  if (_audioCtx && _audioCtx.state === 'suspended') {
+    _audioCtx.resume().then(tryPlay).catch(tryPlay);
+  } else {
+    tryPlay();
+  }
+}
+
+// ── stopBgm ──
+function stopBgm() {
+  if (currentBgm) {
+    currentBgm.pause();
+    currentBgm.currentTime = 0;
+    currentBgm = null;
+  }
   currentBgmFile = null;
 }
 
@@ -4735,26 +4711,25 @@ updateBtn = function() {
 // ===== 裏タブ時の音声停止／復帰 =====
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
-    // HTMLAudio BGMを一時停止（Android/PC）
+    // BGM を一時停止
     if (currentBgm && !currentBgm.paused) {
       currentBgm.pause();
     }
-    // Web Audio API をサスペンド（iOS BGM・SE・ループ音）
+    // Web Audio API（SE用）をサスペンド
     if (_audioCtx && _audioCtx.state === 'running') {
       _audioCtx.suspend().catch(() => {});
     }
   } else {
-    // HTMLAudio BGMを再開（Android/PC）
-    if (!_isIOS && currentBgm && currentBgm.paused && currentBgmFile) {
-      currentBgm.play().catch(() => {});
-    }
-    // Web Audio API を再開（iOS）
+    // Web Audio API を再開してから BGM を再開
+    const doResumeBgm = () => {
+      if (currentBgm && currentBgm.paused && currentBgmFile) {
+        currentBgm.play().catch(() => {});
+      }
+    };
     if (_audioCtx && _audioCtx.state === 'suspended') {
-      _audioCtx.resume().then(() => {
-        if (_isIOS && currentBgmFile && !_bgmSourceNode) {
-          _playBgmWebAudio(currentBgmFile);
-        }
-      }).catch(() => {});
+      _audioCtx.resume().then(doResumeBgm).catch(doResumeBgm);
+    } else {
+      doResumeBgm();
     }
   }
 });

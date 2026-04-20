@@ -683,35 +683,31 @@ let currentBlock = null;
 
 // ===== BGM / 心音管理 =====
 //
-// 【設計方針】
-//   Android / PC : new Audio() で普通に play() するだけ。確実に動く。
-//   iOS (iPhone/iPad) : 同じく new Audio() で play() するが、
-//     iOS は「ユーザー操作の外で play() を呼ぶと無視する」制約がある。
-//     対策として unlockAudio()（最初のタッチ時）に全音声ファイル分の
-//     Audio 要素をあらかじめ作り、volume=0 で play()→pause() して
-//     「再生許可済み」状態にしておく。その後 playBgm() で
-//     currentTime=0, volume=0.55 にして再び play() すれば鳴る。
-//
-//   fetch / decodeAudioData / createMediaElementSource は一切使わない。
+// 【設計方針】example.html と全く同じ方式：
+//   単一の bgm Audio 要素を使い回し、src を切り替えて play() するだけ。
+//   iOS / Android / PC すべてでこの方式が最も確実に動作する。
+//   複雑な unlock 機構・キャッシュ・WebAudio 経由は一切使わない。
 
-let _audioUnlocked = false;
-let currentBgm     = null;   // 現在再生中の HTMLAudioElement
-let currentBgmFile = null;   // 現在再生中のファイル名
-let heartSoundAudio = null;  // 後方互換ダミー
-
-// iOS 用：ファイルごとに Audio 要素をキャッシュ（unlock 済みのものを使い回す）
-const _iosAudioCache = {};
+// example.html と同じ：単一 Audio 要素（初期ファイルはダミーで後で src を上書き）
+const bgm = new Audio();
+bgm.loop = true;
+bgm.volume = 0.55;
 
 // 後方互換ダミー（旧コードの参照が残っている箇所用）
+let currentBgm     = bgm;
+let currentBgmFile = null;
+let heartSoundAudio = null;
 let _bgmSourceNode = null;
 let _bgmGainNode   = null;
 const _bgmBufferCache = {};
 function _stopBgmWebAudio() {}
 function _playBgmWebAudio(f) { playBgm(f); }
-
-// iOS 判定（iPadOS 13+ は Macintosh UA を名乗るため maxTouchPoints で補完）
-const _isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
-  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+function unlockAudio() {
+  // AudioContext（SE用）が suspended なら resume
+  if (_audioCtx && _audioCtx.state === 'suspended') {
+    _audioCtx.resume().catch(() => {});
+  }
+}
 
 // ステージ番号(1-7)に対応するmissionのブロックをランダム取得
 function getBlockForStage(stageId) {
@@ -725,91 +721,25 @@ function getBlockForStage(stageId) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-// iOS 用：unlock 済み Audio 要素を取得（なければ作成）
-function _getIosAudio(soundFile) {
-  if (!_iosAudioCache[soundFile]) {
-    const a = new Audio('sound/' + soundFile);
-    a.loop = true;
-    a.volume = 0.55;
-    _iosAudioCache[soundFile] = a;
-  }
-  return _iosAudioCache[soundFile];
-}
-
-// ── unlockAudio：最初のタッチ時に呼ぶ ──
-function unlockAudio() {
-  // AudioContext は毎回 resume（iOS は操作のたびに suspended になる）
-  if (_audioCtx && _audioCtx.state === 'suspended') {
-    _audioCtx.resume().catch(() => {});
-  }
-  if (_audioUnlocked) return;
-  _audioUnlocked = true;
-
-  // Web Audio API 起動用：無音バッファを再生して AudioContext をアクティブ化
-  try {
-    const ac = getAC();
-    const buf = ac.createBuffer(1, 1, 22050);
-    const src = ac.createBufferSource();
-    src.buffer = buf;
-    src.connect(ac.destination);
-    src.start(0);
-  } catch(e) {}
-
-  // iOS のみ：全心音ファイルの Audio 要素をここで作り、
-  // volume=0 で play()→pause() して「再生許可済み」にする。
-  // これをユーザー操作の同期コールスタック内でやることが iOS では必須。
-  if (_isIOS) {
-    const allSounds = [...new Set(BLOCK_TYPES.map(b => b.sound))];
-    allSounds.forEach(file => {
-      try {
-        const a = _getIosAudio(file);
-        a.volume = 0;
-        const p = a.play();
-        if (p && typeof p.then === 'function') {
-          p.then(() => { a.pause(); a.currentTime = 0; a.volume = 0.55; })
-           .catch(() => { a.volume = 0.55; });
-        }
-      } catch(e) {}
-    });
-  }
-}
-
-// ── playBgm：心音再生（全デバイス共通）──
+// ── playBgm：心音再生（example.html の bgm.src 切替方式と同じ）──
 function playBgm(soundFile) {
-  // すでに同じファイルが再生中なら何もしない
-  if (currentBgmFile === soundFile && currentBgm && !currentBgm.paused) return;
-
-  // 再生中のものを止める
-  if (currentBgm) {
-    currentBgm.pause();
-    currentBgm.currentTime = 0;
-    currentBgm = null;
-  }
+  if (!soundFile) return;
+  const targetSrc = new URL('sound/' + soundFile, location.href).href;
+  // すでに同じファイルが再生中なら何もしない（example.html と同じ判定）
+  if (bgm.src === targetSrc && !bgm.paused) return;
+  // src が違う場合のみ切り替え
+  if (bgm.src !== targetSrc) bgm.src = 'sound/' + soundFile;
+  bgm.loop = true;
+  bgm.volume = 0.55;
+  bgm.currentTime = 0;
+  bgm.play().catch(() => {});
   currentBgmFile = soundFile;
-
-  // iOS はキャッシュ済み Audio 要素を使う、それ以外は毎回 new Audio()
-  const audio = _isIOS ? _getIosAudio(soundFile) : new Audio('sound/' + soundFile);
-  audio.loop = true;
-  audio.volume = 0.55;
-  audio.currentTime = 0;
-  currentBgm = audio;
-
-  // AudioContext が suspended なら resume してから play
-  const tryPlay = () => { audio.play().catch(() => {}); };
-  if (_audioCtx && _audioCtx.state === 'suspended') {
-    _audioCtx.resume().then(tryPlay).catch(tryPlay);
-  } else {
-    tryPlay();
-  }
 }
 
 // ── stopBgm ──
 function stopBgm() {
-  if (currentBgm) {
-    currentBgm.pause();
-    currentBgm.currentTime = 0;
-    currentBgm = null;
-  }
+  bgm.pause();
+  bgm.currentTime = 0;
   currentBgmFile = null;
 }
 
@@ -1253,6 +1183,12 @@ for(let i=0;i<7;i++) {
     speed: 0.008 + Math.random() * 0.012
   });
 }
+
+// ===== 流れ星・ハレー彗星 =====
+let shootingStars = [];
+let halley = null;
+let shootingStarTimer = 2 + Math.random() * 4;
+let halleyTimer = 30 + Math.random() * 60;
 
 let state='start';
 let life=LIFE_MAX; // 後方互換のため残す（内部的にはenergyを使用）
@@ -1878,7 +1814,7 @@ function spawnHeart(){
 // ハートを左右2セット同時出現（各セット4個）
 let heartSetActive = false;
 let heartSetClearTimer = 0;
-const HEART_SET_WAIT = 2.5;
+const HEART_SET_WAIT = 1.5;
 let lastMissedAnswer = null;
 let heartSpawnCount = 0; // 現ステージでのハート出現回数 // 正解ハートを逃したときの正解ラベル
 let hintDismissed = false; // 正解ハート取得時にヒントを非表示にするフラグ
@@ -2047,7 +1983,84 @@ function drawStars(){
   ctx.globalAlpha = 1;
 }
 
-// --- プレイ中：発射元の星を画面下部に表示（上1/3だけ） ---
+// ===== 流れ星・ハレー彗星の更新と描画 =====
+
+function spawnShootingStar() {
+  // 画面上部か左右のどこかから斜め下方向に流れる
+  const fromLeft = Math.random() < 0.5;
+  const angle = (Math.PI / 5) + Math.random() * (Math.PI / 6); // 斜め角度
+  const speed = 350 + Math.random() * 250;
+  const len   = 60  + Math.random() * 80;
+  const x = fromLeft ? -len : W + len;
+  const y = Math.random() * H * 0.6;
+  const vx = fromLeft ?  Math.cos(angle) * speed : -Math.cos(angle) * speed;
+  const vy = Math.abs(Math.sin(angle) * speed);
+  shootingStars.push({ x, y, vx, vy, len, life: 1.0, maxLife: 0.6 + Math.random() * 0.4,
+    alpha: 0.85 + Math.random() * 0.15 });
+}
+
+function spawnHalley() {
+  // 必ず左→右 または 右→左、ゆっくり横断
+  const fromLeft = Math.random() < 0.5;
+  const x = fromLeft ? -120 : W + 120;
+  const y = 40 + Math.random() * H * 0.45;
+  const spd = 80 + Math.random() * 50;
+  const vx = fromLeft ? spd : -spd;
+  const vy = (Math.random() - 0.5) * 18;
+  halley = { x, y, vx, vy, life: 1.0,
+    maxLife: Math.abs((W + 240) / spd),  // 画面横断に必要な時間
+    tailLen: 180 + Math.random() * 80,
+    size: 7 + Math.random() * 4,
+    hue: 180 + Math.random() * 60        // 青緑〜水色
+  };
+}
+
+function updateAndDrawShootingStars(dt) {
+  // タイマー更新（playing / launch_anim / arrive_anim すべてで動く）
+  shootingStarTimer -= dt;
+  if (shootingStarTimer <= 0) {
+    spawnShootingStar();
+    shootingStarTimer = 4.5 + Math.random() * 15;
+  }
+
+  // ── 流れ星の描画と更新 ──
+  for (let i = shootingStars.length - 1; i >= 0; i--) {
+    const s = shootingStars[i];
+    s.x += s.vx * dt;
+    s.y += s.vy * dt;
+    s.life -= dt / s.maxLife;
+    if (s.life <= 0) { shootingStars.splice(i, 1); continue; }
+
+    const a = s.life * s.alpha;
+    const nx = -s.vx / Math.hypot(s.vx, s.vy);
+    const ny = -s.vy / Math.hypot(s.vx, s.vy);
+
+    const grad = ctx.createLinearGradient(
+      s.x, s.y,
+      s.x + nx * s.len, s.y + ny * s.len
+    );
+    grad.addColorStop(0,   `rgba(255,255,255,${a})`);
+    grad.addColorStop(0.3, `rgba(200,220,255,${a * 0.6})`);
+    grad.addColorStop(1,   `rgba(180,200,255,0)`);
+
+    ctx.save();
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y);
+    ctx.lineTo(s.x + nx * s.len, s.y + ny * s.len);
+    ctx.stroke();
+    // 先端の光点
+    ctx.globalAlpha = a;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // ── ハレー彗星の描画と更新 ──
+}
 function drawOriginPlanet(){
   ensureCanvas();
   const s=st();
@@ -2083,7 +2096,7 @@ function drawBgDest(){
   bgDestLastR = r;
   bgDestLastY = dy;
 
-  const alpha = 0.4 + t * 0.6;
+  const alpha = 1.0;  // 常に不透過
 
   drawPlanet(W/2, dy, r, alpha, s.getTo(), s.toColor);
 }
@@ -3206,8 +3219,8 @@ function updateUfos(dt){
 
 // --- 宇宙飛行士 ---
 function spawnAstronaut(){
-  // 同時に2人まで
-  if(astronauts.length >= 2) return;
+  // 同時に1人まで（ミッションに1人）
+  if(astronauts.length >= 1) return;
   const fromLeft = Math.random() < 0.5;
   const sX = fromLeft ? -100 : W + 100;
   const sY = H * 0.3 + Math.random() * (H * 0.3);
@@ -3299,12 +3312,12 @@ function drawAstronaut(a){
 
 function updateAstronauts(dt){
   if(!dt) return;
-  // 宇宙飛行士はミッション３から出現
-  if(st().id >= 3){
+  // 宇宙飛行士はミッション３から出現、かつ画面に0人のときだけスポーン
+  if(st().id >= 3 && astronauts.length === 0){
     astronautSpawnTimer -= dt;
     if(astronautSpawnTimer <= 0){
       spawnAstronaut();
-      astronautSpawnTimer = 35 + Math.random() * 20;
+      astronautSpawnTimer = 9999; // 1ミッション中に1人だけ（startStageでリセット）
     }
   }
 
@@ -3653,7 +3666,7 @@ function loop(ts){
     starScroll+=dt*30;
     for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life-=dt/p.maxLife;}
     particles=particles.filter(p=>p.life>0);
-    drawStars(); drawLaunchAnim(); drawParticles();
+    drawStars(); updateAndDrawShootingStars(dt); drawLaunchAnim(); drawParticles();
     if(launchT>=1) state='playing';
     requestAnimationFrame(loop); return;
   }
@@ -3671,8 +3684,7 @@ function loop(ts){
 
     // 背景を描画
     drawStars();
-
-    // ── パーティクル物理更新 ──
+    updateAndDrawShootingStars(dt);
     for(const p of explosionParticles){
       if(p.delay && explosionT < p.delay) continue;
       p.x += p.vx;
@@ -3856,7 +3868,7 @@ function loop(ts){
     for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life-=dt/p.maxLife;}
     particles=particles.filter(p=>p.life>0);
     updateUfos(dt);
-    drawStars(); drawArriveAnim(); drawParticles();
+    drawStars(); updateAndDrawShootingStars(dt); drawArriveAnim(); drawParticles();
     if(arriveT>=1){
       state=(stageIdx+1<STAGES.length)?'stage_clear':'all_clear';
       _uiTime = 0;
@@ -4051,6 +4063,7 @@ function loop(ts){
   }
 
   drawStars();
+  updateAndDrawShootingStars(dt);
   if(state==='playing'){ drawBgDest(); }
   for(const bh of blackholes) if(bh.alive) drawBlackhole(bh);
   for(const d of debris) if(d.alive) drawMeteor(d);
@@ -4101,6 +4114,7 @@ function startStage(idx){
   spawnTimer=1.5; hitFlash=0; pickupFlash=0; shakeX=0; shakeY=0;
   launchT=0; arriveT=0; bgDestLastR=0; bgDestLastY=0;
   starScroll=0; state='launch_anim';
+  shootingStars=[]; shootingStarTimer=1+Math.random()*3;
   ufoSpawnTimer=8+Math.random()*10;
   astronautSpawnTimer=30+Math.random()*25;
   // ブラックホール初回出現タイマー：ミッションが進むほど早く出現
@@ -4243,7 +4257,9 @@ document.addEventListener('keyup',e=>{
 // =========================
 cv.addEventListener('touchstart',e=>{
   e.preventDefault();
-  unlockAudio(); // iOS Audio アンロック（毎回resume）
+  unlockAudio();
+  // タッチ操作の同期コールスタック内で bgm.play() を呼んで再生許可済みにする
+  bgm.play().catch(() => {});
 
   const t = e.touches[0];
   if(!t) return;
@@ -4305,6 +4321,10 @@ cv.addEventListener('touchend',e=>{
 // クリック（修正版）
 // =========================
 cv.addEventListener('click', (e) => {
+  // クリック操作で bgm を再生許可済みにする（Autoplay Policy対策）
+  bgm.play().catch(() => {});
+  unlockAudio();
+
   // プレイ中、またはアニメーション演出中は無視
   if (state === 'playing' || isAnim()) return;
   
@@ -4341,31 +4361,35 @@ cv.addEventListener('click', (e) => {
 // 1. スタートボタンのクリックイベント修正
 // ==========================================
 document.getElementById('startBtn').addEventListener('click', (e) => {
-  e.stopPropagation(); // イベントの伝播を止めて、下のキャンバスが反応しないようにする
-  unlockAudio(); // iOS Audio アンロック
-  
+  e.stopPropagation();
+  unlockAudio();
+
+  // ======================================================
+  // PC/Android/iOS のAutoplay Policy対策：
+  // ユーザー操作（click）の同期コールスタック内で bgm.play() を
+  // 必ず一度呼んで「再生許可済み」にする。
+  // これをしないと、後でゲームループから playBgm() を呼んでも
+  // ブラウザにブロックされて無音になる。
+  // ======================================================
+  bgm.play().catch(() => {});
+
   if (state === 'stage_clear') {
-    // ミッションクリア後の場合：次のステージへ
     stageIdx++;
     if (stageIdx < STAGES.length) {
-      startFromMap(stageIdx); // 次のステージを開始
+      startFromMap(stageIdx);
     } else {
       state = 'all_clear';
       updateBtn();
     }
   } else if (state === 'over') {
-    // ゲームオーバーの場合：同じステージを再挑戦（stageIdxはそのまま）
     handleStart();
   } else if (state === 'all_clear') {
-    // 全クリアの場合：最初から
     stageIdx = 0;
     handleStart();
   } else {
-    // 初回スタートなどの場合
     handleStart();
   }
-  
-  // ボタンと演出用要素を隠す
+
   document.getElementById('startBtn').classList.add('hidden');
   const hpw = document.getElementById('heartPlanetWrap');
   if(hpw) hpw.style.display = 'none';

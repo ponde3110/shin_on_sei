@@ -582,8 +582,8 @@ function makeSaturnImg(img, diameter) {
 let earthCanvas=null, moonCanvas=null, marsCanvas=null, jupiterCanvas=null, 
     saturnCanvas=null, uranusCanvas=null, neptuneCanvas=null, goalCanvas=null;
 
-// HUD専用の高解像度アイコンキャッシュ（直径80px：DPR=3でも十分な品質）
-const HUD_ICON_D = 80;
+// HUD専用の高解像度アイコンキャッシュ（直径160px：DPR=3でも十分な品質）
+const HUD_ICON_D = 160;
 let hudEarthCanvas=null, hudMoonCanvas=null, hudMarsCanvas=null, hudJupiterCanvas=null,
     hudSaturnCanvas=null, hudUranusCanvas=null, hudNeptuneCanvas=null, hudGoalCanvas=null;
 
@@ -1168,7 +1168,7 @@ const ENERGY_RESCUE_GAIN=50;// 宇宙飛行士救助時のエネルギー回復
 const BG_STARS=[];
 for(let i=0;i<200;i++){
   const rb = 180 + Math.random() * 20 | 0;
-  BG_STARS.push({x:Math.random()*W, y:Math.random()*H, r:Math.random()*1.4+0.2, a:0.5+Math.random()*0.5,
+  BG_STARS.push({x:Math.random()*W, y:Math.random()*H, r:Math.random()*1.8+0.4, a:0.55+Math.random()*0.45,
     color:`rgb(${rb},${rb},255)`});
 }
 const NEBULAS=[];
@@ -1974,11 +1974,34 @@ function drawStars(){
     const layerSpeed = s.r * 0.15;
     const sy = (s.y + starScroll * layerSpeed) % (H + 10);
 
+    ctx.save();
     ctx.globalAlpha = s.a;
-    ctx.fillStyle = s.color;  // 初期化時に固定した色を使用
-    ctx.beginPath(); 
-    ctx.arc(s.x, sy, s.r, 0, Math.PI * 2); 
-    ctx.fill();
+
+    if(s.r >= 1.0){
+      // 大きめの星：グロー＋シャープな中心点
+      const glow = ctx.createRadialGradient(s.x, sy, 0, s.x, sy, s.r * 2.8);
+      glow.addColorStop(0,   s.color.replace('rgb(', 'rgba(').replace(')', `,${s.a})`));
+      glow.addColorStop(0.35,s.color.replace('rgb(', 'rgba(').replace(')', `,${s.a * 0.55})`));
+      glow.addColorStop(1,   s.color.replace('rgb(', 'rgba(').replace(')', ',0)'));
+      ctx.globalAlpha = s.a * 0.7;
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(s.x, sy, s.r * 2.8, 0, Math.PI * 2);
+      ctx.fill();
+      // シャープな中心点
+      ctx.globalAlpha = s.a;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(s.x, sy, Math.max(0.5, s.r * 0.55), 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // 小さい星：1pxのシャープな点
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(s.x, sy, Math.max(0.5, s.r), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
   ctx.globalAlpha = 1;
 }
@@ -3461,6 +3484,12 @@ function drawProgressMap(completedMissions, yOffset){
     ctx.moveTo(x1, lineY); ctx.lineTo(x2, lineY); ctx.stroke();
   }
 
+  // HUD高解像度キャッシュ（航路マップ用）
+  const HUD_MAP_CACHES = [
+    ()=>hudEarthCanvas, ()=>hudMoonCanvas, ()=>hudMarsCanvas, ()=>hudJupiterCanvas,
+    ()=>hudSaturnCanvas, ()=>hudUranusCanvas, ()=>hudNeptuneCanvas, ()=>hudGoalCanvas
+  ];
+
   // Draw planets
   for(let i = 0; i < N; i++){
     const x = 6 + PAD + i * slotW;
@@ -3470,6 +3499,8 @@ function drawProgressMap(completedMissions, yOffset){
     const isDone = (i === 0) || (i <= completedMissions);
     // isVisible: 明瞭に表示するか（クリック可能かにも連動）
     const isVisible = isDone;
+    // 高解像度キャッシュCanvasを優先使用、なければ元画像にフォールバック
+    const hudC = HUD_MAP_CACHES[i]();
     const img = PLANET_IMGS[i]();
     const isSaturn = (i === 4); // 土星はリング付き横長（index=4）
 
@@ -3480,15 +3511,24 @@ function drawProgressMap(completedMissions, yOffset){
       ctx.globalAlpha = 0.18;
     }
 
-    if(img && img.complete && img.naturalWidth){
+    if(hudC){
+      // HUD高解像度キャッシュから描画（シャープな縮小）
       if(isSaturn){
-        // 土星：本体はiconRと同じサイズ、リングは少しだけはみ出す
+        const asp = hudC.width / Math.max(hudC.height, 1);
+        const dh = iconR * 2;
+        const dw = dh * asp;
+        ctx.drawImage(hudC, 0, 0, hudC.width, hudC.height, x - dw/2, lineY - dh/2, dw, dh);
+      } else {
+        ctx.beginPath(); ctx.arc(x, lineY, iconR, 0, Math.PI * 2); ctx.clip();
+        ctx.drawImage(hudC, 0, 0, hudC.width, hudC.height, x - iconR, lineY - iconR, iconR * 2, iconR * 2);
+      }
+    } else if(img && img.complete && img.naturalWidth){
+      if(isSaturn){
         const asp = img.naturalWidth / Math.max(img.naturalHeight, 1);
         const dh = iconR * 2;
         const dw = dh * asp;
         ctx.drawImage(img, x - dw/2, lineY - dh/2, dw, dh);
       } else {
-        // 正方形画像：円形クリップして描画
         const iw = img.naturalWidth, ih = img.naturalHeight;
         const sq = Math.min(iw, ih);
         const sx = (iw - sq) / 2, sy = (ih - sq) / 2;
@@ -3862,7 +3902,7 @@ function loop(ts){
   }
 
   if(state==='arrive_anim'){
-    if(arriveT === 0 && dt > 0){ playArriveSound(); stopUfoLoopSound(); stopBlackholeLoopSound(); }
+    if(arriveT === 0 && dt > 0){ stopBgm(); playArriveSound(); stopUfoLoopSound(); stopBlackholeLoopSound(); }
     arriveT=Math.min(1,arriveT+dt/ARRIVE_DUR);
     starScroll+=dt*20;
     for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life-=dt/p.maxLife;}
@@ -3870,7 +3910,8 @@ function loop(ts){
     updateUfos(dt);
     drawStars(); updateAndDrawShootingStars(dt); drawArriveAnim(); drawParticles();
     if(arriveT>=1){
-      state=(stageIdx+1<STAGES.length)?'stage_clear':'all_clear';
+      const nextState=(stageIdx+1<STAGES.length)?'stage_clear':'all_clear';
+      state = nextState;
       _uiTime = 0;
       // クリア済みミッション数を更新・保存
       completedCount = Math.max(completedCount, stageIdx + 1);
@@ -3878,6 +3919,15 @@ function loop(ts){
       // isAnim()がtrueを返し続けないようにリセット
       arriveT = 0;
       launchT = 0;
+      // 全クリア時はここで直接お祝いを表示（AudioContextがアクティブなタイミングで呼ぶ）
+      if(nextState === 'all_clear'){
+        // AudioContextを確実に起こしてからファンファーレ再生
+        if(_audioCtx && _audioCtx.state === 'suspended'){
+          _audioCtx.resume().then(()=>{ showCelebration(); }).catch(()=>{ showCelebration(); });
+        } else {
+          showCelebration();
+        }
+      }
     }
     requestAnimationFrame(loop); return;
   }
@@ -4194,6 +4244,9 @@ function getClickedStage(mx, my){
 function startFromMap(stage){
   stageIdx = stage;
 
+  // AudioContext を確実に起こす（ロケット噴射音が鳴るように）
+  unlockAudio();
+
   // UI非表示
   startBtn.classList.add('hidden');
   document.getElementById('heartPlanetWrap').style.display = 'none';
@@ -4488,57 +4541,64 @@ function buildJourneyTrail() {
 function playFanfare() {
   try {
     const ac = getAC();
-    if (ac.state === 'suspended') { ac.resume().catch(() => {}); }
+    const doPlay = () => {
+      try {
+        // メロディー：壮大な到達感
+        const melody = [
+          {f:261.63,t:0.0, d:0.12,v:0.15},
+          {f:329.63,t:0.12,d:0.12,v:0.15},
+          {f:392.00,t:0.24,d:0.12,v:0.15},
+          {f:523.25,t:0.36,d:0.25,v:0.20},
+          {f:659.25,t:0.62,d:0.20,v:0.22},
+          {f:783.99,t:0.82,d:0.20,v:0.22},
+          {f:1046.5,t:1.02,d:0.55,v:0.28},
+          {f:783.99,t:1.02,d:0.55,v:0.18},
+          {f:1174.7,t:1.58,d:0.18,v:0.22},
+          {f:1318.5,t:1.76,d:0.90,v:0.30},
+          {f:1046.5,t:1.76,d:0.90,v:0.20},
+        ];
+        melody.forEach(({f,t,d,v})=>{
+          const osc = ac.createOscillator();
+          const gain = ac.createGain();
+          osc.connect(gain); gain.connect(ac.destination);
+          osc.type = 'triangle';
+          osc.frequency.value = f;
+          gain.gain.setValueAtTime(0, ac.currentTime+t);
+          gain.gain.linearRampToValueAtTime(v, ac.currentTime+t+0.03);
+          gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+t+d);
+          osc.start(ac.currentTime+t);
+          osc.stop(ac.currentTime+t+d+0.05);
+        });
 
-    // メロディー：壮大な到達感
-    const melody = [
-      {f:261.63,t:0.0, d:0.12,v:0.15},
-      {f:329.63,t:0.12,d:0.12,v:0.15},
-      {f:392.00,t:0.24,d:0.12,v:0.15},
-      {f:523.25,t:0.36,d:0.25,v:0.20},
-      {f:659.25,t:0.62,d:0.20,v:0.22},
-      {f:783.99,t:0.82,d:0.20,v:0.22},
-      {f:1046.5,t:1.02,d:0.55,v:0.28},
-      {f:783.99,t:1.02,d:0.55,v:0.18},
-      {f:1174.7,t:1.58,d:0.18,v:0.22},
-      {f:1318.5,t:1.76,d:0.90,v:0.30},
-      {f:1046.5,t:1.76,d:0.90,v:0.20},
-    ];
-    melody.forEach(({f,t,d,v})=>{
-      const osc = ac.createOscillator();
-      const gain = ac.createGain();
-      osc.connect(gain); gain.connect(ac.destination);
-      osc.type = 'triangle';
-      osc.frequency.value = f;
-      gain.gain.setValueAtTime(0, ac.currentTime+t);
-      gain.gain.linearRampToValueAtTime(v, ac.currentTime+t+0.03);
-      gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+t+d);
-      osc.start(ac.currentTime+t);
-      osc.stop(ac.currentTime+t+d+0.05);
-    });
+        // ベース和音
+        [[130.81,261.63],[164.81,329.63],[196.00,392.00]].forEach(([f1,f2],i)=>{
+          [f1,f2].forEach(f=>{
+            const osc=ac.createOscillator(), gain=ac.createGain();
+            osc.connect(gain); gain.connect(ac.destination);
+            osc.type='sine'; osc.frequency.value=f;
+            gain.gain.setValueAtTime(0.06,ac.currentTime+1.02);
+            gain.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+2.8);
+            osc.start(ac.currentTime+1.02);
+            osc.stop(ac.currentTime+2.85);
+          });
+        });
 
-    // ベース和音
-    [[130.81,261.63],[164.81,329.63],[196.00,392.00]].forEach(([f1,f2],i)=>{
-      [f1,f2].forEach(f=>{
-        const osc=ac.createOscillator(), gain=ac.createGain();
-        osc.connect(gain); gain.connect(ac.destination);
-        osc.type='sine'; osc.frequency.value=f;
-        gain.gain.setValueAtTime(0.06,ac.currentTime+1.02);
-        gain.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+2.8);
-        osc.start(ac.currentTime+1.02);
-        osc.stop(ac.currentTime+2.85);
-      });
-    });
-
-    // 到着フラッシュ時の衝撃音（2.8秒後）
-    const boom = ac.createOscillator();
-    const boomGain = ac.createGain();
-    boom.connect(boomGain); boomGain.connect(ac.destination);
-    boom.type = 'sine'; boom.frequency.value = 80;
-    boomGain.gain.setValueAtTime(0.35, ac.currentTime+2.8);
-    boomGain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+3.3);
-    boom.start(ac.currentTime+2.8); boom.stop(ac.currentTime+3.35);
-
+        // 到着フラッシュ時の衝撃音（2.8秒後）
+        const boom = ac.createOscillator();
+        const boomGain = ac.createGain();
+        boom.connect(boomGain); boomGain.connect(ac.destination);
+        boom.type = 'sine'; boom.frequency.value = 80;
+        boomGain.gain.setValueAtTime(0.35, ac.currentTime+2.8);
+        boomGain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+3.3);
+        boom.start(ac.currentTime+2.8); boom.stop(ac.currentTime+3.35);
+      } catch(e){}
+    };
+    // AudioContext が suspended なら resume してから再生
+    if (ac.state === 'suspended') {
+      ac.resume().then(doPlay).catch(doPlay);
+    } else {
+      doPlay();
+    }
   } catch(e){}
 }
 
@@ -4715,19 +4775,12 @@ celebClose.addEventListener('click', (e) => {
 // =============================
 // 全クリア時にお祝い表示を呼ぶ
 // =============================
-// arrive_anim が終わって all_clear になる瞬間をフック
-const _origLoop_allclear = loop;
-// arrive_animの完了検出：arriveT>=1かつstageIdx==6(最終)の時にお祝い
-// loop内のarriveT>=1処理の後でstate='all_clear'になるので、
-// updateBtn()で検出するのが確実
+// all_clear への遷移はゲームループ内で直接 showCelebration() を呼ぶようにしたため、
+// updateBtn フックでの二重呼び出しは行わない。
 let _prevState = state;
 const _origUpdateBtn = updateBtn;
 updateBtn = function() {
   _origUpdateBtn();
-  if(state === 'all_clear' && _prevState !== 'all_clear') {
-    // 即座にお祝いオーバーレイを表示
-    showCelebration();
-  }
   _prevState = state;
 };
 

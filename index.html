@@ -1162,8 +1162,8 @@ const FIXED_SPEED=0.45;
 const LIFE_MAX=30; // 後方互換のため残す
 const ENERGY_MAX=100; // エネルギーの最大値
 const ENERGY_MOVE_COST=3; // 移動1秒あたりのエネルギー消費
-const ENERGY_HIT_COST=18;   // 隕石衝突時のエネルギー消費
-const ENERGY_MISS_COST=17;  // 正解ハートを逃した時のエネルギー消費
+const ENERGY_HIT_COST=20;   // 隕石衝突時のエネルギー消費
+const ENERGY_MISS_COST=20;  // 正解ハートを逃した時のエネルギー消費
 const ENERGY_WRONG_COST=25; // 不正解ハート取得時のエネルギー消費
 const ENERGY_BH_COST=0;    // ブラックホール接触時のエネルギー消費
 const ENERGY_HEART_GAIN=25; // 正解ハート取得時のエネルギー回復
@@ -1660,9 +1660,9 @@ function updateBlackholes(dt){
   }
   suckingObjects = suckingObjects.filter(s => s.scale > 0);
 
-  // ブラックホールが1つ以上生きていて、かつplaying中のみループ音ON
+  // ブラックホールが1つ以上生きている間は常にループ音ON（状態を問わず）
   const bhAlive = blackholes.some(bh => bh.alive);
-  if (bhAlive && state === 'playing') {
+  if (bhAlive) {
     startBlackholeLoopSound();
   } else {
     stopBlackholeLoopSound();
@@ -1843,8 +1843,8 @@ function spawnHeartSets(){
   const stageId = st().id; // 1-7
   currentBlock = getBlockForStage(stageId);
 
-  // BGM再生（新しい心音ファイルで切り替え）
-  playBgm(currentBlock.sound);
+  // BGM再生（playing中のみ）
+  if (state === 'playing') playBgm(currentBlock.sound);
 
   // 1セット = 2個（左半分に1個・右半分に1個）
   // どちらか一方がランダムで正解（黄色）
@@ -4695,7 +4695,8 @@ function resetAnim(el) {
 }
 
 function showCelebration() {
-  // リセット
+  // 心音・BGMを確実に停止
+  stopBgm();
   resetAnim(celebHeart);
   resetAnim(celebStetho);
   resetAnim(celebFlash);

@@ -2492,15 +2492,7 @@ function drawHintComment(comment){
   ctx.fillStyle = bg;
   ctx.beginPath(); ctx.roundRect(PX, PY, PW, PH, 5); ctx.fill();
 
-  // シアン枠線
-  ctx.strokeStyle = 'rgba(100,200,255,0.45)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.roundRect(PX, PY, PW, PH, 5); ctx.stroke();
 
-  // 上部ハイライトライン
-  ctx.strokeStyle = 'rgba(160,230,255,0.25)';
-  ctx.lineWidth = 0.5;
-  ctx.beginPath(); ctx.moveTo(PX+6, PY+1); ctx.lineTo(PX+PW-6, PY+1); ctx.stroke();
 
   // 「ヒント：」ラベル（明るいシアン・太字）
   ctx.textAlign = 'left';
@@ -2542,15 +2534,7 @@ function drawMissedAnswer(label){
   ctx.fillStyle = bg;
   ctx.beginPath(); ctx.roundRect(PX, PY, PW, PH, 5); ctx.fill();
 
-  // オレンジ枠線
-  ctx.strokeStyle = 'rgba(255,160,60,0.6)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.roundRect(PX, PY, PW, PH, 5); ctx.stroke();
 
-  // 上部ハイライトライン
-  ctx.strokeStyle = 'rgba(255,200,100,0.25)';
-  ctx.lineWidth = 0.5;
-  ctx.beginPath(); ctx.moveTo(PX+6, PY+1); ctx.lineTo(PX+PW-6, PY+1); ctx.stroke();
 
   // 「正解：」ラベル（オレンジ・太字）
   ctx.textAlign = 'left';

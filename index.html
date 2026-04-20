@@ -432,10 +432,10 @@ html, body {
 <div id="rwrap">
 <canvas id="rc"></canvas>
 <div id="heartPlanetWrap">
-  <img id="heartPlanet" src="goal.png" alt="goal">
+  <img id="heartPlanet" src="goal.webp" alt="goal">
 
   <div id="orbitPath">
-    <img id="orbitStethoscope" src="stethoscope.png" alt="stethoscope">
+    <img id="orbitStethoscope" src="stethoscope.webp" alt="stethoscope">
   </div>
 </div>
 <button id="startBtn">START MISSION</button>
@@ -457,8 +457,8 @@ html, body {
     <div class="glow-ring" id="ring1"></div>
     <div class="glow-ring" id="ring2"></div>
     <div class="glow-ring" id="ring3"></div>
-    <img id="celebHeart" src="goal.png" alt="心臓星">
-    <img id="celebStetho" src="stethoscope.png" alt="聴診器">
+    <img id="celebHeart" src="goal.webp" alt="心臓星">
+    <img id="celebStetho" src="stethoscope.webp" alt="聴診器">
     <div id="mergeFlash"></div>
     <div id="mergeFlash2"></div>
   </div>
@@ -528,34 +528,36 @@ function updateBtn(){
 }
 
 // --- 画像ロード ---
-const rocketImg    = new Image(); rocketImg.src = 'rocket.png';
-const moonImg      = new Image(); moonImg.src   = 'moon.png';
-const earthImg     = new Image(); earthImg.src  = 'earth.png';
-const marsImg      = new Image(); marsImg.src   = 'mars.png';
-const jupiterImg   = new Image(); jupiterImg.src = 'jupiter.png';
-const saturnImg    = new Image(); saturnImg.src  = 'saturn.png';
-const uranusImg    = new Image(); uranusImg.src  = 'uranus.png';
-const neptuneImg   = new Image(); neptuneImg.src = 'neptune.png';
-const goalImg      = new Image(); goalImg.src    = 'goal.png';
-const meteoriteImg = new Image(); meteoriteImg.src = 'meteorite.png';
-const heartImg     = new Image(); heartImg.src = 'heart.png';
-const ufoImg       = new Image(); ufoImg.src   = 'ufo.png';
-const astronautImg = new Image(); astronautImg.src = 'astronaut.png';
-const blackholeImg = new Image(); blackholeImg.src = 'blackhole.png';
+const rocketImg    = new Image(); rocketImg.src = 'rocket.webp';
+const moonImg      = new Image(); moonImg.src   = 'moon.webp';
+const earthImg     = new Image(); earthImg.src  = 'earth.webp';
+const marsImg      = new Image(); marsImg.src   = 'mars.webp';
+const jupiterImg   = new Image(); jupiterImg.src = 'jupiter.webp';
+const saturnImg    = new Image(); saturnImg.src  = 'saturn.webp';
+const uranusImg    = new Image(); uranusImg.src  = 'uranus.webp';
+const neptuneImg   = new Image(); neptuneImg.src = 'neptune.webp';
+const goalImg      = new Image(); goalImg.src    = 'goal.webp';
+const meteoriteImg = new Image(); meteoriteImg.src = 'meteorite.webp';
+const heartImg     = new Image(); heartImg.src = 'heart.webp';
+const ufoImg       = new Image(); ufoImg.src   = 'ufo.webp';
+const astronautImg = new Image(); astronautImg.src = 'astronaut.webp';
+const blackholeImg = new Image(); blackholeImg.src = 'blackhole.webp';
 
 // 円形に切り抜いたオフスクリーンCanvas（通常惑星用）
 function makeRoundImg(img, diameter) {
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  const sq = Math.min(iw, ih);
+  // 元画像より大きなCanvasに引き伸ばさない（ぼやけ防止）
+  const d = Math.min(diameter, sq);
   const oc = document.createElement('canvas');
-  oc.width = oc.height = diameter;
+  oc.width = oc.height = d;
   const c = oc.getContext('2d');
   c.imageSmoothingEnabled = true; 
   c.imageSmoothingQuality = 'high';
   c.beginPath(); 
-  c.arc(diameter / 2, diameter / 2, diameter / 2, 0, Math.PI * 2); 
+  c.arc(d / 2, d / 2, d / 2, 0, Math.PI * 2); 
   c.clip();
-  const iw = img.naturalWidth, ih = img.naturalHeight;
-  const sq = Math.min(iw, ih);
-  c.drawImage(img, (iw - sq) / 2, (ih - sq) / 2, sq, sq, 0, 0, diameter, diameter);
+  c.drawImage(img, (iw - sq) / 2, (ih - sq) / 2, sq, sq, 0, 0, d, d);
   return oc;
 }
 
@@ -564,13 +566,14 @@ function makeRoundImg(img, diameter) {
 function makeSaturnImg(img, diameter) {
   const iw = img.naturalWidth, ih = img.naturalHeight;
   const aspect = iw / Math.max(ih, 1);
-  // リングを含む横幅に合わせてキャンバスを横長に確保
-  const cw = Math.round(diameter * Math.max(aspect, 1.8));
+  // 元画像より大きく引き伸ばさない（ぼやけ防止）
+  const d = Math.min(diameter, ih);
+  const cw = Math.round(d * Math.max(aspect, 1.8));
   const ch = Math.round(cw / aspect);
   const oc = document.createElement('canvas');
   oc.width = cw; oc.height = ch;
-  oc._isSaturn = true; // 特別フラグ
-  oc._planetR = diameter / 2; // 惑星本体の半径（リング除く）
+  oc._isSaturn = true;
+  oc._planetR = d / 2; // 惑星本体の半径（リング除く）
   const c = oc.getContext('2d');
   c.imageSmoothingEnabled = true;
   c.imageSmoothingQuality = 'high';
@@ -1517,7 +1520,7 @@ function drawBlackhole(bh) {
     ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
   }
 
-  // 2. blackhole.png 描画
+  // 2. blackhole.webp 描画
   if(blackholeImg.complete && blackholeImg.naturalWidth > 0){
     // ── まず中央に「真っ黒な下地」を作る ──
     ctx.fillStyle = '#000';

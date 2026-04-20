@@ -702,11 +702,18 @@ let _bgmGainNode   = null;
 const _bgmBufferCache = {};
 function _stopBgmWebAudio() {}
 function _playBgmWebAudio(f) { playBgm(f); }
+// ===== Web Audio SE =====
+let _audioCtx = null;
 function unlockAudio() {
-  // AudioContext（SE用）が suspended なら resume
-  if (_audioCtx && _audioCtx.state === 'suspended') {
-    _audioCtx.resume().catch(() => {});
+  // AudioContext（SE用）がまだ未生成なら、ユーザージェスチャーのタイミングで生成する
+  if (!_audioCtx) {
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
+  // suspended なら resume し、完了まで待てるよう Promise を返す
+  if (_audioCtx.state === 'suspended') {
+    return _audioCtx.resume();
+  }
+  return Promise.resolve();
 }
 
 // ステージ番号(1-7)に対応するmissionのブロックをランダム取得
@@ -743,11 +750,8 @@ function stopBgm() {
   currentBgmFile = null;
 }
 
-// ===== Web Audio SE =====
-let _audioCtx = null;
 function getAC() {
-  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (_audioCtx.state === 'suspended') _audioCtx.resume();
+  if (_audioCtx && _audioCtx.state === 'suspended') _audioCtx.resume();
   return _audioCtx;
 }
 
@@ -1814,7 +1818,7 @@ function spawnHeart(){
 // ハートを左右2セット同時出現（各セット4個）
 let heartSetActive = false;
 let heartSetClearTimer = 0;
-const HEART_SET_WAIT = 1.5;
+const HEART_SET_WAIT = 1.0;
 let lastMissedAnswer = null;
 let heartSpawnCount = 0; // 現ステージでのハート出現回数 // 正解ハートを逃したときの正解ラベル
 let hintDismissed = false; // 正解ハート取得時にヒントを非表示にするフラグ
@@ -4241,11 +4245,11 @@ function getClickedStage(mx, my){
 // =========================
 // ステージ開始（統一）
 // =========================
-function startFromMap(stage){
+async function startFromMap(stage){
   stageIdx = stage;
 
-  // AudioContext を確実に起こす（ロケット噴射音が鳴るように）
-  unlockAudio();
+  // AudioContext の resume() が完了するまで待ってからアニメ開始
+  await unlockAudio();
 
   // UI非表示
   startBtn.classList.add('hidden');
@@ -4308,9 +4312,9 @@ document.addEventListener('keyup',e=>{
 // =========================
 // タッチ開始（統一版）
 // =========================
-cv.addEventListener('touchstart',e=>{
+cv.addEventListener('touchstart', async (e) => {
   e.preventDefault();
-  unlockAudio();
+  await unlockAudio();
   // タッチ操作の同期コールスタック内で bgm.play() を呼んで再生許可済みにする
   bgm.play().catch(() => {});
 
@@ -4373,10 +4377,10 @@ cv.addEventListener('touchend',e=>{
 // =========================
 // クリック（修正版）
 // =========================
-cv.addEventListener('click', (e) => {
+cv.addEventListener('click', async (e) => {
   // クリック操作で bgm を再生許可済みにする（Autoplay Policy対策）
+  await unlockAudio();
   bgm.play().catch(() => {});
-  unlockAudio();
 
   // プレイ中、またはアニメーション演出中は無視
   if (state === 'playing' || isAnim()) return;
@@ -4413,17 +4417,9 @@ cv.addEventListener('click', (e) => {
 // ==========================================
 // 1. スタートボタンのクリックイベント修正
 // ==========================================
-document.getElementById('startBtn').addEventListener('click', (e) => {
+document.getElementById('startBtn').addEventListener('click', async (e) => {
   e.stopPropagation();
-  unlockAudio();
-
-  // ======================================================
-  // PC/Android/iOS のAutoplay Policy対策：
-  // ユーザー操作（click）の同期コールスタック内で bgm.play() を
-  // 必ず一度呼んで「再生許可済み」にする。
-  // これをしないと、後でゲームループから playBgm() を呼んでも
-  // ブラウザにブロックされて無音になる。
-  // ======================================================
+  await unlockAudio();
   bgm.play().catch(() => {});
 
   if (state === 'stage_clear') {

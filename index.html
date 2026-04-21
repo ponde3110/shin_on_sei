@@ -253,10 +253,10 @@ html, body {
   background: white;
   opacity: 0;
   pointer-events: none;
-  animation: flashBurst 0.5s ease-out 2.8s forwards;
+  /* flashBurst削除：白い空白を出さない */
 }
 @keyframes flashBurst {
-  0%   { opacity: 0.9; }
+  0%   { opacity: 0; }
   100% { opacity: 0; }
 }
 
@@ -407,24 +407,27 @@ html, body {
 }
 
 .confetti {
-  position: absolute; border-radius: 2px;
+  position: absolute;
+  pointer-events: none;
   animation: confettiFall linear forwards;
+  transform-origin: center center;
 }
 @keyframes confettiFall {
-  0%   { transform: translateY(-20px) rotate(0deg) scaleX(1);    opacity:1; }
-  50%  { transform: translateY(260px) rotate(360deg) scaleX(0.6); opacity:0.9; }
-  100% { transform: translateY(540px) rotate(720deg) scaleX(1);   opacity:0; }
+  0%   { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 .sparkle {
   position: absolute; pointer-events: none;
-  animation: sparklePop linear forwards;
+  animation: sparklePop ease-out forwards;
   font-size: 16px; line-height: 1;
 }
 @keyframes sparklePop {
-  0%   { transform: scale(0) rotate(0deg);    opacity:1; }
-  40%  { transform: scale(1.4) rotate(90deg); opacity:1; }
-  100% { transform: scale(0) rotate(180deg);  opacity:0; }
+  0%   { transform: scale(0) rotate(0deg);     opacity:1; }
+  35%  { transform: scale(1.6) rotate(120deg); opacity:1; }
+  70%  { transform: scale(1.0) rotate(200deg); opacity:0.7; }
+  100% { transform: scale(0.2) rotate(280deg); opacity:0; }
 }
 
 </style>
@@ -916,6 +919,66 @@ function playMissSE() {
   } catch(e) {}
 }
 
+// スラスター噴射音（左右移動時：短い低周波バースト）
+let _thrusterSoundTimer = 0;
+function playThrusterSE() {
+  // 連打防止：0.12秒に1回まで
+  if (!_audioCtx || _thrusterSoundTimer > 0) return;
+  _thrusterSoundTimer = 0.12;
+  try {
+    const ac = getAC();
+    if (!ac) return;
+    const now = ac.currentTime;
+    const bufLen = ac.sampleRate * 0.10;
+    const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufLen, 1.5);
+    const noise = ac.createBufferSource();
+    noise.buffer = buf;
+    const lp = ac.createBiquadFilter();
+    lp.type = 'bandpass'; lp.frequency.value = 180; lp.Q.value = 1.2;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.07, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.10);
+    noise.connect(lp); lp.connect(g); g.connect(ac.destination);
+    noise.start(now);
+  } catch(e) {}
+}
+
+// ハレー彗星出現音（不気味な下降する唸り）
+function playHalleyAppearSE() {
+  try {
+    const ac = getAC();
+    if (!ac) return;
+    const now = ac.currentTime;
+    // 下降するオシレータ（遠くから迫る感）
+    const osc = ac.createOscillator();
+    const g = ac.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(320, now);
+    osc.frequency.exponentialRampToValueAtTime(55, now + 1.8);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.04, now + 0.15);
+    g.gain.setValueAtTime(0.04, now + 1.2);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 1.9);
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 900;
+    osc.connect(lp); lp.connect(g); g.connect(ac.destination);
+    osc.start(now); osc.stop(now + 2.0);
+    // 重低音の唸り
+    const osc2 = ac.createOscillator();
+    const g2 = ac.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(48, now + 0.2);
+    osc2.frequency.linearRampToValueAtTime(28, now + 1.8);
+    g2.gain.setValueAtTime(0, now + 0.2);
+    g2.gain.linearRampToValueAtTime(0.06, now + 0.5);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 2.0);
+    osc2.connect(g2); g2.connect(ac.destination);
+    osc2.start(now + 0.2); osc2.stop(now + 2.1);
+  } catch(e) {}
+}
+
 // 隕石衝突：ドスンと鈍い衝撃音
 function playMeteorHitSE() {
   try {
@@ -1005,29 +1068,29 @@ function startBlackholeLoopSound() {
     const now = ac.currentTime;
     const masterGain = ac.createGain();
     masterGain.gain.setValueAtTime(0, now);
-    masterGain.gain.linearRampToValueAtTime(0.045, now + 1.2);
+    masterGain.gain.linearRampToValueAtTime(0.13, now + 1.2);
     masterGain.connect(ac.destination);
 
     const lfo = ac.createOscillator();
     lfo.type = 'sine';
-    lfo.frequency.value = 0.3;
+    lfo.frequency.value = 0.25;
     const lfoGain = ac.createGain();
-    lfoGain.gain.value = 8;
+    lfoGain.gain.value = 10;
 
     const osc1 = ac.createOscillator();
     osc1.type = 'sine';
-    osc1.frequency.value = 42;
+    osc1.frequency.value = 36;
     lfo.connect(lfoGain);
     lfoGain.connect(osc1.frequency);
     osc1.connect(masterGain);
 
     const osc2 = ac.createOscillator();
     osc2.type = 'sawtooth';
-    osc2.frequency.value = 68;
+    osc2.frequency.value = 58;
     const lp = ac.createBiquadFilter();
-    lp.type = 'lowpass'; lp.frequency.value = 180;
+    lp.type = 'lowpass'; lp.frequency.value = 200;
     const g2 = ac.createGain();
-    g2.gain.value = 0.35;
+    g2.gain.value = 0.5;
     osc2.connect(lp); lp.connect(g2); g2.connect(masterGain);
 
     lfo.start(); osc1.start(); osc2.start();
@@ -1219,7 +1282,7 @@ let rocketShakeT=0; // for playing shake
 
 // 大破アニメーション
 let explosionT = 0;          // 大破アニメーションタイマー
-const EXPLOSION_DUR = 3.5;   // 大破演出の秒数
+const EXPLOSION_DUR = 5.0;   // 大破演出の秒数
 let explosionParticles = [];  // 爆発パーティクル
 let explosionX = 0;           // 爆発位置X
 let explosionY = 0;           // 爆発位置Y
@@ -1332,7 +1395,7 @@ function spawnExplosionParticles(cx, cy) {
   // 🔥 第1波：超高速コア炎球（白→橙→赤）
   for(let i = 0; i < 80; i++){
     const angle = Math.random() * Math.PI * 2;
-    const spd = 3.5 + Math.random() * 7.0;
+    const spd = 1.8 + Math.random() * 3.5;
     const t = Math.random();
     const color = t < 0.3 ? '#ffffff' : t < 0.6 ? '#ffee88' : t < 0.8 ? '#ff8800' : '#ff3300';
     explosionParticles.push({
@@ -1340,9 +1403,9 @@ function spawnExplosionParticles(cx, cy) {
       vx: Math.cos(angle) * spd,
       vy: Math.sin(angle) * spd,
       r: 4 + Math.random() * 8,
-      life: 1, maxLife: 0.5 + Math.random() * 0.5,
+      life: 1, maxLife: 1.0 + Math.random() * 1.0,
       color,
-      grav: 0.06, drag: 0.94,
+      grav: 0.03, drag: 0.96,
       isFireball: true
     });
   }
@@ -1350,7 +1413,7 @@ function spawnExplosionParticles(cx, cy) {
   // 💥 第2波：中速の炎・オレンジ煙の混合
   for(let i = 0; i < 60; i++){
     const angle = Math.random() * Math.PI * 2;
-    const spd = 1.5 + Math.random() * 4.0;
+    const spd = 0.8 + Math.random() * 2.0;
     const isSmoke = Math.random() < 0.4;
     explosionParticles.push({
       x: cx + (Math.random()-0.5)*10,
@@ -1358,10 +1421,10 @@ function spawnExplosionParticles(cx, cy) {
       vx: Math.cos(angle) * spd,
       vy: Math.sin(angle) * spd,
       r: isSmoke ? 10 + Math.random()*16 : 3 + Math.random()*6,
-      life: 1, maxLife: isSmoke ? 1.5 + Math.random()*1.2 : 0.8 + Math.random()*0.6,
+      life: 1, maxLife: isSmoke ? 2.5 + Math.random()*1.5 : 1.5 + Math.random()*1.0,
       color: isSmoke ? `rgba(${60+Math.random()*40|0},${30+Math.random()*20|0},${10+Math.random()*10|0},0.7)` : '#ff6600',
-      grav: isSmoke ? -0.015 : 0.04,
-      drag: isSmoke ? 0.97 : 0.96,
+      grav: isSmoke ? -0.015 : 0.02,
+      drag: isSmoke ? 0.97 : 0.97,
       isSmoke, isFireball: !isSmoke
     });
   }
@@ -1370,18 +1433,18 @@ function spawnExplosionParticles(cx, cy) {
   const debrisColors = ['#aabbcc','#8899aa','#ccd0d4','#ff6600','#ffaa44','#334455'];
   for(let i = 0; i < 22; i++){
     const angle = Math.random() * Math.PI * 2;
-    const spd = 2.5 + Math.random() * 6.0;
+    const spd = 1.2 + Math.random() * 3.0;
     explosionParticles.push({
       x: cx + (Math.random()-0.5)*16,
       y: cy + (Math.random()-0.5)*16,
       vx: Math.cos(angle) * spd,
-      vy: Math.sin(angle) * spd - 1.5,
+      vy: Math.sin(angle) * spd - 0.8,
       r: 3 + Math.random() * 6,
-      life: 1, maxLife: 2.0 + Math.random() * 2.0,
+      life: 1, maxLife: 3.5 + Math.random() * 2.5,
       color: debrisColors[Math.floor(Math.random()*debrisColors.length)],
-      grav: 0.08, drag: 0.992,
+      grav: 0.04, drag: 0.995,
       rot: Math.random()*Math.PI*2,
-      rotV: (Math.random()-0.5) * 0.35,
+      rotV: (Math.random()-0.5) * 0.20,
       isDebris: true,
       trail: []
     });
@@ -1390,16 +1453,16 @@ function spawnExplosionParticles(cx, cy) {
   // ✨ 火の粉（細長い軌跡付き・放物線）
   for(let i = 0; i < 55; i++){
     const angle = -Math.PI*0.5 + (Math.random()-0.5)*Math.PI*2;
-    const spd = 2.0 + Math.random() * 6.5;
+    const spd = 1.0 + Math.random() * 3.0;
     explosionParticles.push({
       x: cx + (Math.random()-0.5)*8,
       y: cy + (Math.random()-0.5)*8,
       vx: Math.cos(angle) * spd,
-      vy: Math.sin(angle) * spd - 0.5,
+      vy: Math.sin(angle) * spd - 0.3,
       r: 1.2 + Math.random() * 1.8,
-      life: 1, maxLife: 1.2 + Math.random() * 1.8,
+      life: 1, maxLife: 2.0 + Math.random() * 2.5,
       color: Math.random() < 0.5 ? '#ffee66' : '#ff9922',
-      grav: 0.10, drag: 0.988,
+      grav: 0.05, drag: 0.992,
       isEmber: true,
       trail: []
     });
@@ -1408,17 +1471,17 @@ function spawnExplosionParticles(cx, cy) {
   // 🌫 遅れて膨らむ煙雲（黒〜暗灰）
   for(let i = 0; i < 28; i++){
     const angle = Math.random() * Math.PI * 2;
-    const spd = 0.4 + Math.random() * 1.5;
+    const spd = 0.2 + Math.random() * 0.8;
     const gray = 15 + Math.random()*35 | 0;
     explosionParticles.push({
       x: cx + (Math.random()-0.5)*20,
       y: cy + (Math.random()-0.5)*20,
       vx: Math.cos(angle) * spd,
-      vy: Math.sin(angle) * spd - 0.3,
+      vy: Math.sin(angle) * spd - 0.2,
       r: 14 + Math.random() * 20,
-      life: 1, maxLife: 2.5 + Math.random() * 1.5,
+      life: 1, maxLife: 4.0 + Math.random() * 2.0,
       color: `rgba(${gray},${gray},${gray},0.55)`,
-      grav: -0.008, drag: 0.975,
+      grav: -0.005, drag: 0.978,
       isSmokePuff: true,
       delay: 0.15 + Math.random() * 0.35
     });
@@ -1664,9 +1727,9 @@ function updateBlackholes(dt){
   }
   suckingObjects = suckingObjects.filter(s => s.scale > 0);
 
-  // ブラックホールが1つ以上生きている間は常にループ音ON（状態を問わず）
+  // ブラックホールが生きていてかつplaying中のみループ音ON
   const bhAlive = blackholes.some(bh => bh.alive);
-  if (bhAlive) {
+  if (bhAlive && state === 'playing') {
     startBlackholeLoopSound();
   } else {
     stopBlackholeLoopSound();
@@ -2083,6 +2146,7 @@ function updateAndDrawShootingStars(dt) {
     halleyTimer -= dt;
     if (halleyTimer <= 0) {
       spawnHalley();
+      playHalleyAppearSE();
       halleyTimer = 8 + Math.random() * 7;
     }
   }
@@ -3189,7 +3253,7 @@ function drawArriveAnim(){
 
   // 2. ロケットの描画：playing終了時の大きさ(scale=1)から縮小
   const rocketScale = Math.max(0, 1.0 * (1 - t));
-  const alpha = Math.max(0, 1 - t * 1.2);
+  const alpha = 1.0; // 不透過（半透明にしない）
   // Y座標：ロケットの通常位置(H-90)から上へ移動
   const rocketY = (H - 90) - (t * H * 0.65);
 
@@ -3206,7 +3270,9 @@ function drawArriveAnim(){
   // 3. テキスト表示
   if(t > 0.3){
     const a = Math.min(1, (t - 0.3) * 3);
-    ctx.fillStyle = `rgba(255,255,255,${a})`;
+    // 最終ミッション（心臓星）は明るいシアン、それ以外は白
+    const isFinal = s.arriveText && s.arriveText.includes('心臓星');
+    ctx.fillStyle = isFinal ? `rgba(0,255,220,${a})` : `rgba(255,255,255,${a})`;
     ctx.font = "bold 20px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
     ctx.textAlign = 'center';
     ctx.fillText(s.arriveText, W/2, H * 0.45);
@@ -3502,14 +3568,28 @@ function updateAstronauts(dt){
     a.timer += dt;
     a.rot += a.rotV;
 
-    // 衝突速度を位置に反映・減衰
-    if(a.vx || a.vy){
+    // 衝突速度を位置に反映・減衰（blownモードは後で独自処理するのでスキップ）
+    if((a.vx || a.vy) && a.mode !== 'blown'){
       a.x += a.vx * dt * 60;
       a.y += a.vy * dt * 60;
       a.vx *= Math.pow(0.85, dt * 60);
       a.vy *= Math.pow(0.85, dt * 60);
       if(Math.abs(a.vx) < 0.01) a.vx = 0;
       if(Math.abs(a.vy) < 0.01) a.vy = 0;
+    }
+
+    // blown: 彗星に吹き飛ばされた（回転しながら画面外へ）
+    if(a.mode === 'blown'){
+      a.x += a.vx * dt * 60;
+      a.y += a.vy * dt * 60;
+      a.vy += 0.04; // 重力
+      a.vx *= 0.995;
+      a.rot += a.rotV * 3.0;
+      a.captureAlpha = Math.max(0, (a.captureAlpha || 1) - dt * 0.35);
+      if(a.x < -80 || a.x > W + 80 || a.y > H + 80 || a.captureAlpha <= 0){
+        a.alive = false;
+      }
+      continue;
     }
 
     if(a.mode === 'enter'){
@@ -3887,19 +3967,22 @@ function checkHalleyCollisions(){
       }
     }
 
-    // 宇宙飛行士を押しのける
+    // 宇宙飛行士を吹き飛ばす（blownモードへ移行）
     for (const a of astronauts) {
-      if (!a.alive) continue;
+      if (!a.alive || a.mode === 'blown') continue;
       const dx = a.x - h.x, dy = a.y - h.y;
       const dist2 = dx*dx + dy*dy;
       const minD = h.r + a.r;
       if (dist2 < minD*minD && dist2 > 0) {
         const dist = Math.sqrt(dist2);
         const nx = dx/dist, ny = dy/dist;
-        const force = 10 + h.r * 0.15;
-        a.vx += nx * force;
-        a.vy += ny * force;
-        a.driftOffset += (Math.random()-0.5) * 2;
+        // 吹き飛ばし速度（ロケット爆発時の宇宙飛行士と同程度）
+        const force = 1.8 + Math.random() * 1.0;
+        a.vx = nx * force + (Math.random()-0.5) * 0.5;
+        a.vy = ny * force - 0.8 - Math.random() * 0.5;
+        a.mode = 'blown';
+        a.captureAlpha = 1.0;
+        a.rotV = (Math.random() < 0.5 ? 1 : -1) * (0.02 + Math.random() * 0.03);
       }
     }
 
@@ -4075,14 +4158,14 @@ function loop(ts){
     explosionParticles = explosionParticles.filter(p => p.life > 0);
 
     // ── ロケット残骸：3つに分解して飛散 ──
-    if(explosionT < 1.8){
+    if(explosionT < 5.0){
       const frags = [
-        { ox:-18, oy:-30, rot: explosionT * 5,   vx:-1.8, vy:-2.2, sc: Math.max(0.05, 0.7 - explosionT*0.38) },
-        { ox: 14, oy:-10, rot:-explosionT * 6.5,  vx: 2.2, vy:-1.5, sc: Math.max(0.05, 0.6 - explosionT*0.32) },
-        { ox:  0, oy: 20, rot: explosionT * 4,   vx: 0.4, vy: 2.5, sc: Math.max(0.05, 0.5 - explosionT*0.27) },
+        { ox:-18, oy:-30, rot: explosionT * 2.5,  vx:-1.0, vy:-1.5, sc: Math.max(0.15, 0.9 - explosionT*0.22) },
+        { ox: 14, oy:-10, rot:-explosionT * 3.0,  vx: 1.4, vy:-0.9, sc: Math.max(0.15, 0.8 - explosionT*0.20) },
+        { ox:  0, oy: 20, rot: explosionT * 2.0,  vx: 0.3, vy: 1.6, sc: Math.max(0.15, 0.7 - explosionT*0.17) },
       ];
       for(const f of frags){
-        const alpha = Math.max(0, 1 - explosionT * 0.65);
+        const alpha = Math.max(0, 1 - explosionT * 0.35);
         if(alpha <= 0) continue;
         ctx.save();
         ctx.globalAlpha = alpha;
@@ -4091,10 +4174,8 @@ function loop(ts){
         ctx.translate(fx, fy);
         ctx.rotate(f.rot);
         ctx.scale(f.sc, f.sc);
-        if(rocketImg && rocketImg.complete && rocketImg.naturalWidth > 0){
-          if(astronautImg.complete && astronautImg.naturalWidth > 0){
-            ctx.drawImage(astronautImg, -22, -22, 44, 44);
-          }
+        if(astronautImg.complete && astronautImg.naturalWidth > 0){
+          ctx.drawImage(astronautImg, -38, -38, 76, 76);
         }
         ctx.restore();
       }
@@ -4127,6 +4208,8 @@ function loop(ts){
       _uiTime = 0;
       launchT = 0;
       arriveT = 0;
+      stopBlackholeLoopSound();
+      stopUfoLoopSound();
     }
 
     requestAnimationFrame(loop); return;
@@ -4189,6 +4272,9 @@ function loop(ts){
     if(right) rocketVX+=thrust*dt;
     // 左右移動時のエネルギー消費
     if(left||right) energy=Math.max(0, energy-ENERGY_MOVE_COST*dt);
+    // スラスタータイマー更新・音
+    if(_thrusterSoundTimer > 0) _thrusterSoundTimer -= dt;
+    if((left||right) && _thrusterSoundTimer <= 0) playThrusterSE();
 
     // ブラックホールが近くにある場合は減衰を弱める（rocketVXへの寄与を残すため）
     let bhNearFactor = 0;
@@ -4830,23 +4916,69 @@ function playFanfare() {
 
 // 豪華紙吹雪
 function spawnConfetti(count=80) {
-  const colors = ['#ff4488','#ffcc00','#44ddff','#88ff44','#ff8844','#cc44ff','#ffffff','#ffaacc','#aaddff'];
+  const colors = [
+    '#ff3366','#ff6600','#ffcc00','#00cc66','#00aaff','#aa44ff',
+    '#ff99cc','#ffffff','#ffee88','#88ffdd','#ff4444','#44ddff'
+  ];
+  const shapes = ['rect','rect','rect','circle','ribbon'];
+  const overlayRect = celebOverlay.getBoundingClientRect();
+  const OW = overlayRect.width  || 320;
+  const OH = overlayRect.height || 560;
+
   for(let i = 0; i < count; i++){
     const el = document.createElement('div');
     el.className = 'confetti';
-    el.style.left = (Math.random() * 100) + '%';
-    el.style.top = (Math.random() * -20) + 'px';
-    el.style.background = colors[Math.floor(Math.random()*colors.length)];
-    const dur = 2.2 + Math.random() * 2.8;
+    const shape = shapes[Math.floor(Math.random()*shapes.length)];
+    const color = colors[Math.floor(Math.random()*colors.length)];
+    const sz = 6 + Math.random() * 9;
+
+    // 形状
+    if(shape === 'circle'){
+      el.style.width = el.style.height = sz + 'px';
+      el.style.borderRadius = '50%';
+    } else if(shape === 'ribbon'){
+      el.style.width  = (sz * 0.35) + 'px';
+      el.style.height = (sz * 2.8)  + 'px';
+      el.style.borderRadius = '2px';
+    } else {
+      el.style.width  = sz + 'px';
+      el.style.height = (sz * (0.35 + Math.random()*0.5)) + 'px';
+      el.style.borderRadius = '1px';
+    }
+    el.style.background = color;
+    el.style.position = 'absolute';
+
+    // 開始位置：画面上部 + 少しランダム
+    const startX = Math.random() * OW;
+    const startY = -sz - Math.random() * 60;
+    el.style.left = startX + 'px';
+    el.style.top  = startY + 'px';
+
+    // 物理パラメータ
+    const dur    = 2.8 + Math.random() * 2.4; // 落下時間
+    const delay  = Math.random() * 1.8;
+    const driftX = (Math.random() - 0.5) * OW * 0.55; // 横流れ
+    const endY   = OH + sz + 20;
+    const rotEnd = (Math.random() < 0.5 ? 1 : -1) * (360 + Math.random() * 720);
+    const swingAmp = 18 + Math.random() * 22; // 横揺れ幅
+    const swingFreq = 1.5 + Math.random() * 2.0;
+
     el.style.animationDuration = dur + 's';
-    el.style.animationDelay = (Math.random() * 2.0) + 's';
-    const sz = 5 + Math.random() * 10;
-    el.style.width = sz + 'px';
-    el.style.height = (sz * (0.4 + Math.random() * 0.8)) + 'px';
-    el.style.borderRadius = Math.random() < 0.4 ? '50%' : '1px';
-    el.style.transform = `rotate(${Math.random()*360}deg)`;
+    el.style.animationDelay    = delay + 's';
+
+    // Web Animations APIで物理的な落下
+    const travelY = endY - startY;
+    const kf = [
+      { transform: `translate(0px, 0px) rotate(0deg) scaleX(1)`,         opacity: 1,   offset: 0 },
+      { transform: `translate(${driftX*0.3 + swingAmp}px, ${travelY*0.25}px) rotate(${rotEnd*0.25}deg) scaleX(0.7)`, opacity: 1,   offset: 0.25 },
+      { transform: `translate(${driftX*0.6 - swingAmp}px, ${travelY*0.55}px) rotate(${rotEnd*0.55}deg) scaleX(1.0)`, opacity: 0.95, offset: 0.55 },
+      { transform: `translate(${driftX*0.85 + swingAmp*0.5}px, ${travelY*0.82}px) rotate(${rotEnd*0.82}deg) scaleX(0.6)`, opacity: 0.7, offset: 0.82 },
+      { transform: `translate(${driftX}px, ${travelY}px) rotate(${rotEnd}deg) scaleX(1)`,  opacity: 0,   offset: 1 },
+    ];
+    el.animate(kf, { duration: dur * 1000, delay: delay * 1000, fill: 'forwards', easing: 'ease-in' });
+
     celebOverlay.appendChild(el);
-    el.addEventListener('animationend', () => el.remove());
+    setTimeout(() => { if(el.parentNode) el.remove(); }, (dur + delay + 0.5) * 1000);
   }
 }
 

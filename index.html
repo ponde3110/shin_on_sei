@@ -1113,6 +1113,25 @@ function stopBlackholeLoopSound() {
   _bhLoopNodes = null;
 }
 
+// ===== 全効果音を即時停止する関数（到着アニメ開始時に必ず呼ぶ） =====
+function stopAllSounds() {
+  // 心音BGM停止
+  stopBgm();
+  // UFOループ音停止
+  stopUfoLoopSound();
+  // ブラックホールループ音停止
+  stopBlackholeLoopSound();
+  // ロケット噴射音停止
+  stopLaunchSound();
+  // Web Audio上のワンショット音（心音以外のSE）をまとめて即時フェードアウトさせる
+  // AudioContext をいったん suspend → resume することで鳴りっぱなしのノードを強制終了
+  if (_audioCtx && _audioCtx.state === 'running') {
+    _audioCtx.suspend().then(() => {
+      _audioCtx.resume().catch(() => {});
+    }).catch(() => {});
+  }
+}
+
 // UFO出現：宇宙的なビュイーン音
 function playUfoAppearSE() {
   try {
@@ -4216,7 +4235,7 @@ function loop(ts){
   }
 
   if(state==='arrive_anim'){
-    if(arriveT === 0 && dt > 0){ stopBgm(); playArriveSound(); stopUfoLoopSound(); stopBlackholeLoopSound(); }
+    if(arriveT === 0 && dt > 0){ stopAllSounds(); setTimeout(()=>playArriveSound(), 80); }
     arriveT=Math.min(1,arriveT+dt/ARRIVE_DUR);
     starScroll+=dt*20;
     for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life-=dt/p.maxLife;}
@@ -4310,7 +4329,8 @@ function loop(ts){
     for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life-=dt/p.maxLife;}
     particles=particles.filter(p=>p.life>0);
 
-    for(const d of debris){d.x+=d.vx;d.y+=d.vy;d.rot+=d.rotV;}
+    const dtScale = dt * 60; // 60fps基準の係数（60fpsなら≒1、低fpsほど大きくなる）
+    for(const d of debris){d.x+=d.vx*dtScale;d.y+=d.vy*dtScale;d.rot+=d.rotV*dtScale;}
     debris=debris.filter(d=>d.y<H+40&&d.x<W+40&&d.alive);
 
     // 隕石同士の衝突
@@ -4341,18 +4361,18 @@ function loop(ts){
     }
 
     for(const it of items){
-      it.x+=it.vx; it.y+=it.vy;
+      it.x+=it.vx*dtScale; it.y+=it.vy*dtScale;
       // 弾かれた後、元の軌跡に徐々に戻す
       if(it.bumped){
-        it.bumpT=(it.bumpT||0)+0.04;
+        it.bumpT=(it.bumpT||0)+0.04*dtScale;
         const resume=Math.min(1,it.bumpT);
-        it.vx+=(it.origVx-it.vx)*0.08;
-        it.vy+=(it.origVy-it.vy)*0.08;
+        it.vx+=(it.origVx-it.vx)*Math.min(1, 0.08*dtScale);
+        it.vy+=(it.origVy-it.vy)*Math.min(1, 0.08*dtScale);
         if(resume>=1&&Math.abs(it.vx-it.origVx)<0.05&&Math.abs(it.vy-it.origVy)<0.05){
           it.vx=it.origVx; it.vy=it.origVy; it.bumped=false;
         }
       } else {
-        it.vx*=0.96;
+        it.vx*=Math.pow(0.96, dtScale);
       }
     }
 
@@ -4425,7 +4445,7 @@ function loop(ts){
     }
     { const maxHearts = s.heartCount || 6;
       if(heartSpawnCount >= maxHearts && !heartSetActive && heartSetClearTimer <= 0){
-        state='arrive_anim'; arriveT=0; stopBgm(); stopUfoLoopSound(); stopBlackholeLoopSound();
+        state='arrive_anim'; arriveT=0; stopAllSounds();
       }
     }
   }

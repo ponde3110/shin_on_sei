@@ -542,6 +542,7 @@ const heartImg     = new Image(); heartImg.src = 'heart.webp';
 const ufoImg       = new Image(); ufoImg.src   = 'ufo.webp';
 const astronautImg = new Image(); astronautImg.src = 'astronaut.webp';
 const blackholeImg = new Image(); blackholeImg.src = 'blackhole.webp';
+const halleyImg    = new Image(); halleyImg.src    = 'halley.webp';
 
 // 円形に切り抜いたオフスクリーンCanvas（通常惑星用）
 function makeRoundImg(img, diameter) {
@@ -650,14 +651,14 @@ const STAGES=[
     fromColor:'#dfd193', toColor:'#ace5ee',
   },
   {
-    id:6, goal:3500, heartCount:6, label:'ミッション６：肺高血圧の鑑別', bgHue:210, debrisSpd:3.0,
+    id:6, goal:3500, heartCount:6, label:'ミッション６：特殊疾患の鑑別', bgHue:210, debrisSpd:3.0,
     launchText:'天王星を出発！', arriveText:'海王星に到着！',
     getFrom:()=>uranusCanvas, getTo:()=>neptuneCanvas,
     getHudFrom:()=>hudUranusCanvas, getHudTo:()=>hudNeptuneCanvas,
     fromColor:'#ace5ee', toColor:'#4b70dd',
   },
   {
-    id:7, goal:4000, heartCount:9, label:'最終ミッション：心疾患の鑑別', bgHue:280, debrisSpd:3.5,
+    id:7, goal:4000, heartCount:9, label:'最終ミッション：多彩な心疾患の鑑別', bgHue:280, debrisSpd:3.5,
     launchText:'海王星を出発！', arriveText:'心臓星に到着！',
     getFrom:()=>neptuneCanvas, getTo:()=>goalCanvas,
     getHudFrom:()=>hudNeptuneCanvas, getHudTo:()=>hudGoalCanvas,
@@ -1193,9 +1194,9 @@ for(let i=0;i<7;i++) {
 
 // ===== 流れ星・ハレー彗星 =====
 let shootingStars = [];
-let halley = null;
 let shootingStarTimer = 2 + Math.random() * 4;
-let halleyTimer = 30 + Math.random() * 60;
+let halleyTimer = 8 + Math.random() * 7; // 60〜120秒に1回（稀）
+let halleys = []; // ゲームオブジェクトとしてのハレー彗星配列
 
 let state='start';
 let life=LIFE_MAX; // 後方互換のため残す（内部的にはenergyを使用）
@@ -2030,19 +2031,43 @@ function spawnShootingStar() {
 }
 
 function spawnHalley() {
-  // 必ず左→右 または 右→左、ゆっくり横断
-  const fromLeft = Math.random() < 0.5;
-  const x = fromLeft ? -120 : W + 120;
-  const y = 40 + Math.random() * H * 0.45;
-  const spd = 80 + Math.random() * 50;
-  const vx = fromLeft ? spd : -spd;
-  const vy = (Math.random() - 0.5) * 18;
-  halley = { x, y, vx, vy, life: 1.0,
-    maxLife: Math.abs((W + 240) / spd),  // 画面横断に必要な時間
-    tailLen: 180 + Math.random() * 80,
-    size: 7 + Math.random() * 4,
-    hue: 180 + Math.random() * 60        // 青緑〜水色
-  };
+
+  // 出現位置（上から）
+  const x = Math.random() * W;
+  const y = -60;
+
+  // ★ ロケット位置（あなたのコードに合わせる）
+  const rx = rocketX;
+  const ry = H - 90;
+
+  // ★ 少しブレを入れる（自然化）
+  const targetX = rx + (Math.random() - 0.5) * 80;
+  const targetY = ry + (Math.random() - 0.5) * 80;
+
+  let dx = targetX - x;
+  let dy = targetY - y;
+  let dist = Math.hypot(dx, dy);
+
+  // ★ 安全対策
+  if (!isFinite(dist) || dist < 0.001) {
+    dx = 0;
+    dy = 1;
+    dist = 1;
+  }
+
+  const speed = 1.0 + Math.random() * 0.8;
+
+  const vx = dx / dist * speed;
+  const vy = dy / dist * speed;
+
+  halleys.push({
+    x, y, vx, vy,
+    r: 6 + Math.random() * 3,
+    rot: Math.random() * Math.PI * 2,
+    rotV: (Math.random() - 0.5) * 0.8,
+    alive: true,
+    trail: []
+  });
 }
 
 function updateAndDrawShootingStars(dt) {
@@ -2051,6 +2076,15 @@ function updateAndDrawShootingStars(dt) {
   if (shootingStarTimer <= 0) {
     spawnShootingStar();
     shootingStarTimer = 4.5 + Math.random() * 15;
+  }
+
+  // ハレー彗星タイマー（playing中のみ）
+  if (state === 'playing') {
+    halleyTimer -= dt;
+    if (halleyTimer <= 0) {
+      spawnHalley();
+      halleyTimer = 8 + Math.random() * 7;
+    }
   }
 
   // ── 流れ星の描画と更新 ──
@@ -2089,8 +2123,135 @@ function updateAndDrawShootingStars(dt) {
     ctx.restore();
   }
 
-  // ── ハレー彗星の描画と更新 ──
+  // ── ハレー彗星の位置更新のみ（描画はdrawHalleys()で行う）──
+  for (let i = halleys.length - 1; i >= 0; i--) {
+    const h = halleys[i];
+    if (!h.alive) { halleys.splice(i, 1); continue; }
+    h.x += h.vx;
+    h.y += h.vy;
+    h.rot += h.rotV;
+    h.trail.push({ x: h.x, y: h.y });
+    if (h.trail.length > 8) h.trail.shift();
+    if (h.y > H + 80 || h.x < -80 || h.x > W + 80) {
+      halleys.splice(i, 1); continue;
+    }
+  }
 }
+
+// ── ハレー彗星の描画（直線テール版）──
+function drawHalleys() {
+  for (const h of halleys) {
+    if (!h.alive) continue;
+
+    const spd = Math.hypot(h.vx, h.vy) || 1;
+    const tx = -h.vx / spd;
+    const ty = -h.vy / spd;
+
+    const px = -ty;
+    const py = tx;
+
+    const tailLen = 160 + h.r * 8;
+    const dustLen = tailLen * 0.75;
+
+    // 太さ（ここだけ調整）
+    const widthScale = 1.8;
+    const halfW = h.r * widthScale;
+
+    ctx.save();
+
+    // ── 尾①：メインテール（まっすぐ）
+    const ionSlices = 12;
+    for (let k = 0; k < ionSlices; k++) {
+
+      const t1 = k / ionSlices;
+      const t2 = (k + 1) / ionSlices;
+
+      // ★ 根元
+      const nx1 = h.x + px * (-halfW + 2 * halfW * t1);
+      const ny1 = h.y + py * (-halfW + 2 * halfW * t1);
+      const nx2 = h.x + px * (-halfW + 2 * halfW * t2);
+      const ny2 = h.y + py * (-halfW + 2 * halfW * t2);
+
+      // ★ 先端（広げない＝平行移動）
+      const fx1 = nx1 + tx * tailLen;
+      const fy1 = ny1 + ty * tailLen;
+      const fx2 = nx2 + tx * tailLen;
+      const fy2 = ny2 + ty * tailLen;
+
+      const edgeFrac = 1 - Math.abs((t1 + t2) * 0.5 - 0.5) * 2;
+
+      const grad = ctx.createLinearGradient(h.x, h.y, h.x + tx * tailLen, h.y + ty * tailLen);
+      const baseAlpha = edgeFrac * edgeFrac * 0.55;
+
+      grad.addColorStop(0,    `rgba(255,120,80,${baseAlpha})`);
+      grad.addColorStop(0.3,  `rgba(220,60,40,${baseAlpha * 0.75})`);
+      grad.addColorStop(0.65, `rgba(180,30,20,${baseAlpha * 0.35})`);
+      grad.addColorStop(1,    'rgba(120,0,10,0)');
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(nx1, ny1);
+      ctx.lineTo(nx2, ny2);
+      ctx.lineTo(fx2, fy2);
+      ctx.lineTo(fx1, fy1);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // ── 尾②：ダスト尾（同じく直線）
+    const dustSlices = 10;
+    for (let k = 0; k < dustSlices; k++) {
+
+      const t1 = k / dustSlices;
+      const t2 = (k + 1) / dustSlices;
+
+      const nx1 = h.x + px * (-halfW + 2 * halfW * t1);
+      const ny1 = h.y + py * (-halfW + 2 * halfW * t1);
+      const nx2 = h.x + px * (-halfW + 2 * halfW * t2);
+      const ny2 = h.y + py * (-halfW + 2 * halfW * t2);
+
+      const fx1 = nx1 + tx * dustLen;
+      const fy1 = ny1 + ty * dustLen;
+      const fx2 = nx2 + tx * dustLen;
+      const fy2 = ny2 + ty * dustLen;
+
+      const edgeFrac = 1 - Math.abs((t1 + t2) * 0.5 - 0.5) * 2;
+
+      const grad = ctx.createLinearGradient(h.x, h.y, h.x + tx * dustLen, h.y + ty * dustLen);
+      const baseAlpha = edgeFrac * edgeFrac * 0.30;
+
+      grad.addColorStop(0,    `rgba(200,60,120,${baseAlpha})`);
+      grad.addColorStop(0.4,  `rgba(160,30,80,${baseAlpha * 0.5})`);
+      grad.addColorStop(1,    'rgba(100,0,40,0)');
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(nx1, ny1);
+      ctx.lineTo(nx2, ny2);
+      ctx.lineTo(fx2, fy2);
+      ctx.lineTo(fx1, fy1);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // ── 核
+    ctx.translate(h.x, h.y);
+    ctx.rotate(h.rot);
+
+    if (halleyImg.complete && halleyImg.naturalWidth > 0) {
+      const s = h.r * 2.0;
+      ctx.drawImage(halleyImg, -s/2, -s/2, s, s);
+    } else {
+      ctx.fillStyle = 'rgba(255,200,180,0.95)';
+      ctx.beginPath();
+      ctx.arc(0, 0, h.r * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+}
+
 function drawOriginPlanet(){
   ensureCanvas();
   const s=st();
@@ -3687,6 +3848,85 @@ function checkAstronautHeartCollision(){
   // ハートは宇宙飛行士とも干渉しない
 }
 
+// ハレー彗星が隕石・UFO・宇宙飛行士を押しのける＋ロケットに即爆発
+function checkHalleyCollisions(){
+  const rx = rocketX, ry = H - 90;
+  const hitPoints = getRocketHitPoints(rx, ry, rocketTilt);
+
+  for (const h of halleys) {
+    if (!h.alive) continue;
+
+    // 隕石を押しのける
+    for (const d of debris) {
+      if (!d.alive) continue;
+      const dx = d.x - h.x, dy = d.y - h.y;
+      const dist2 = dx*dx + dy*dy;
+      const minD = h.r + d.r;
+      if (dist2 < minD*minD && dist2 > 0) {
+        const dist = Math.sqrt(dist2);
+        const nx = dx/dist, ny = dy/dist;
+        const force = 4 + h.r * 0.1;  // ← 半分くらいに
+        d.vx += nx * force;
+        d.vy += ny * force;
+      }
+    }
+
+    // UFOを押しのける
+    for (const u of ufos) {
+      if (!u.alive) continue;
+      const dx = u.x - h.x, dy = u.y - h.y;
+      const dist2 = dx*dx + dy*dy;
+      const minD = h.r + (u.r || 24);
+      if (dist2 < minD*minD && dist2 > 0) {
+        const dist = Math.sqrt(dist2);
+        const nx = dx/dist, ny = dy/dist;
+        const force = 10;
+        u.x += nx * force;
+        u.y += ny * force;
+        if (u.vx !== undefined) { u.vx += nx * 3; u.vy += ny * 3; }
+      }
+    }
+
+    // 宇宙飛行士を押しのける
+    for (const a of astronauts) {
+      if (!a.alive) continue;
+      const dx = a.x - h.x, dy = a.y - h.y;
+      const dist2 = dx*dx + dy*dy;
+      const minD = h.r + a.r;
+      if (dist2 < minD*minD && dist2 > 0) {
+        const dist = Math.sqrt(dist2);
+        const nx = dx/dist, ny = dy/dist;
+        const force = 10 + h.r * 0.15;
+        a.vx += nx * force;
+        a.vy += ny * force;
+        a.driftOffset += (Math.random()-0.5) * 2;
+      }
+    }
+
+    // ロケットに当たると即爆発
+    let hitRocket = false;
+    for (const [px, py] of hitPoints) {
+      const dx = h.x - px, dy = h.y - py;
+      if (dx*dx + dy*dy < (h.r + 4) * (h.r + 4)) { hitRocket = true; break; }
+    }
+    if (hitRocket && state === 'playing') {
+      h.alive = false;
+      energy = 0;
+      life = 0;
+      state = 'exploding';
+      _uiTime = 0;
+      explosionT = 0;
+      explosionX = rocketX;
+      explosionY = H - 90;
+      explosionPlayed = false;
+      stopBgm();
+      stopUfoLoopSound();
+      stopBlackholeLoopSound();
+      spawnExplosionParticles(explosionX, explosionY);
+    }
+  }
+}
+
 function loop(ts){
   const dt=Math.min((ts-lastTime)/1000,0.05);
   lastTime=ts;
@@ -3942,7 +4182,7 @@ function loop(ts){
       }
     }
 
-    const thrust=320+speed*100;
+    const thrust=340+speed*110;
     const left=keys['ArrowLeft']||keys['a']||keys['A'];
     const right=keys['ArrowRight']||keys['d']||keys['D'];
     if(left)  rocketVX-=thrust*dt;
@@ -4075,6 +4315,7 @@ function loop(ts){
     checkDebrisHitsObjects();
     checkAstronautHeartCollision();
     checkBlackholeCollisions(dt);
+    checkHalleyCollisions();
     items=items.filter(it=>it.y<H+60&&it.alive);
     updateUfos(dt);
     updateAstronauts(dt);
@@ -4111,6 +4352,7 @@ function loop(ts){
   drawSuckingObjects();
   for(const a of astronauts) if(a.alive) drawAstronaut(a);
   for(const u of ufos) drawUfo(u);
+  drawHalleys();
   for(const it of items) if(it.alive) drawHeartItem(it);
   if(state==='playing'){
     // Rocket wobble during playing
@@ -4156,6 +4398,7 @@ function startStage(idx){
   launchT=0; arriveT=0; bgDestLastR=0; bgDestLastY=0;
   starScroll=0; state='launch_anim';
   shootingStars=[]; shootingStarTimer=1+Math.random()*3;
+  halleys=[]; halleyTimer=8+Math.random()*7;
   ufoSpawnTimer=8+Math.random()*10;
   astronautSpawnTimer=30+Math.random()*25;
   // ブラックホール初回出現タイマー：ミッションが進むほど早く出現

@@ -4111,22 +4111,43 @@ function checkHalleyCollisions(){
   }
 }
 
+let _launchSoundPlayed = false;
 function loop(ts){
   const dt=Math.min((ts-lastTime)/1000,0.05);
   lastTime=ts;
 
-let _launchSoundPlayed = false;
+if(state==='launch_anim'){
 
-  if(state==='launch_anim'){
-    if(!_launchSoundPlayed){ _launchSoundPlayed = true; playLaunchSound(); }
-    launchT=Math.min(1,launchT+dt/LAUNCH_DUR);
-    starScroll+=dt*30;
-    for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life-=dt/p.maxLife;}
-    particles=particles.filter(p=>p.life>0);
-    drawStars(); updateAndDrawShootingStars(dt); drawLaunchAnim(); drawParticles();
-    if(launchT>=1) state='playing';
-    requestAnimationFrame(loop); return;
+  // 1回だけ再生
+  if(!_launchSoundPlayed){
+    _launchSoundPlayed = true;
+    playLaunchSound();
   }
+
+  // アニメーション進行
+  launchT = Math.min(1, launchT + dt / LAUNCH_DUR);
+  starScroll += dt * 30;
+
+  for(const p of particles){
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= dt / p.maxLife;
+  }
+  particles = particles.filter(p => p.life > 0);
+
+  drawStars();
+  updateAndDrawShootingStars(dt);
+  drawLaunchAnim();
+  drawParticles();
+
+  // 状態遷移
+  if(launchT >= 1){
+    state = 'playing';
+  }
+
+  requestAnimationFrame(loop);
+  return;
+}
 
   // ===== 大破アニメーション =====
   if(state === 'exploding'){

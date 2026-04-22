@@ -55,14 +55,15 @@ html, body {
   bottom: 33%;
   z-index: 10;
 
-  white-space: nowrap;
+  white-space: pre-line;
   min-width: 140px;
+  text-align: center;
 
   padding: 12px 28px;
   font-size: 16px;
   font-weight: 800;
   letter-spacing: 2px;
-  line-height: 1;
+  line-height: 1.45;
 
   color: #ffffff;
   border: 1px solid rgba(255,255,255,0.18);
@@ -477,7 +478,7 @@ const ctx=cv.getContext('2d');
 const W=320,H=520;
 
 // デバイスピクセル比（Retina/iPad対応）
-const DPR = Math.min(window.devicePixelRatio || 1, 3);
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
 
 // canvasの物理解像度をDPRに合わせてスケールアップ
 cv.width  = W * DPR;
@@ -504,7 +505,9 @@ window.addEventListener('resize', resizeCanvas);
 const startBtn=document.getElementById('startBtn');
 function updateBtn(){
   if(state==='start'){
-    startBtn.textContent='スタート！';
+    const comment = STAGES[0] ? STAGES[0].label.split('：')[1] || '' : '';
+    startBtn.innerHTML = 'スタート！'
+      + (comment ? '<br><span style="font-size:11px;font-weight:600;letter-spacing:0.5px;opacity:0.88;">（' + comment + '）</span>' : '');
     startBtn.classList.remove('hidden');
   }
   else{
@@ -512,17 +515,23 @@ function updateBtn(){
   }
 
   if(state==='over'){
-    startBtn.textContent='再挑戦する';
+    const cur = STAGES[stageIdx];
+    const comment = cur ? cur.label.split('：')[1] || '' : '';
+    startBtn.innerHTML = '再挑戦する'
+      + (comment ? '<br><span style="font-size:11px;font-weight:600;letter-spacing:0.5px;opacity:0.88;">（' + comment + '）</span>' : '');
     startBtn.classList.remove('hidden');
   }
   else if(state==='stage_clear'){
     const nextIdx=stageIdx+1;
-    const nextLabel=STAGES[nextIdx]?STAGES[nextIdx].label.split('：')[0]:'';
-    startBtn.textContent=(nextLabel?nextLabel:'次のミッション')+'へ出発！';
+    const next = STAGES[nextIdx];
+    const nextLabel = next ? next.label.split('：')[0] : '';
+    const nextComment = next ? next.label.split('：')[1] || '' : '';
+    const line1 = (nextLabel ? nextLabel : '次のミッション') + 'へ出発！';
+    startBtn.innerHTML = line1
+      + (nextComment ? '<br><span style="font-size:11px;font-weight:600;letter-spacing:0.5px;opacity:0.88;">（' + nextComment + '）</span>' : '');
     startBtn.classList.remove('hidden');
   }
   else if(state==='all_clear'){
-    // お祝いオーバーレイ側で「もう一度プレイ」を提供するため、ここではボタンを表示しない
     startBtn.classList.add('hidden');
   }
   else if(state!=='start'){
@@ -1256,7 +1265,7 @@ const ENERGY_HEART_GAIN=25; // 正解ハート取得時のエネルギー回復
 const ENERGY_RESCUE_GAIN=50;// 宇宙飛行士救助時のエネルギー回復
 
 const BG_STARS=[];
-for(let i=0;i<200;i++){
+for(let i=0;i<50;i++){
   const rb = 180 + Math.random() * 20 | 0;
   BG_STARS.push({x:Math.random()*W, y:Math.random()*H, r:Math.random()*1.8+0.4, a:0.55+Math.random()*0.45,
     color:`rgb(${rb},${rb},255)`});
@@ -1941,7 +1950,7 @@ function spawnHeartSets(){
   const sharedY = -20;
 
   for(let side = 0; side < 2; side++){
-    const xMin = side === 0 ? 30  : W/2 + 20;
+    const xMin = side === 0 ? 30  : W/2 + 30;
     const xMax = side === 0 ? W/2 - 20 : W - 30;
     const x = xMin + Math.random() * (xMax - xMin);
     items.push({
@@ -2160,13 +2169,21 @@ function updateAndDrawShootingStars(dt) {
     shootingStarTimer = 4.5 + Math.random() * 15;
   }
 
-  // ハレー彗星タイマー（playing中のみ）
-  if (state === 'playing') {
+  // ハレー彗星タイマー（ミッション2以降・playing中のみ）
+  if (state === 'playing' && st().id >= 2) {
     halleyTimer -= dt;
-    if (halleyTimer <= 0) {
+    if (halleyTimer <= 0 && halleys.length < 2) {
       spawnHalley();
       playHalleyAppearSE();
-      halleyTimer = 8 + Math.random() * 7;
+    }
+    if (halleyTimer <= 0) {
+      // ミッションが進むほど間隔を短縮
+      // id=2: 22〜32秒、id=3: 18〜26秒、id=4: 14〜20秒
+      // id=5: 11〜16秒、id=6: 8〜13秒、id=7: 6〜10秒
+      const sid = st().id;
+      const base = Math.max(6,  28 - (sid - 2) * 4.0);
+      const rng  = Math.max(4,  10 - (sid - 2) * 1.0);
+      halleyTimer = base + Math.random() * rng;
     }
   }
 
@@ -3710,6 +3727,13 @@ function drawProgressMap(completedMissions, yOffset){
   ctx.font = "bold 8px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
   ctx.textAlign = 'center';
   ctx.fillText('航路マップ', W/2, mapY + 11);
+  // 右側に補足テキスト（航路マップ文字幅の右端から始める）
+  const titleW = ctx.measureText('航路マップ').width;
+  ctx.fillStyle = 'rgba(160,200,255,0.55)';
+  ctx.font = "6px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
+  ctx.textAlign = 'left';
+  ctx.fillText('（クリア面は選択可）', W/2 + titleW/2 + 3, mapY + 11);
+  ctx.textAlign = 'center';
 
   const N = 8;
   const PAD = 18;
@@ -4504,7 +4528,17 @@ function startStage(idx){
   launchT=0; arriveT=0; bgDestLastR=0; bgDestLastY=0;
   starScroll=0; state='launch_anim';
   shootingStars=[]; shootingStarTimer=1+Math.random()*3;
-  halleys=[]; halleyTimer=8+Math.random()*7;
+  { // ハレー彗星タイマー初期値（ミッション1は使わない、2以降はidに応じて短縮）
+    const sid = STAGES[idx] ? STAGES[idx].id : 1;
+    if (sid < 2) {
+      halleyTimer = 9999; // ミッション1では出現しない
+    } else {
+      const base = Math.max(6,  28 - (sid - 2) * 4.0);
+      const rng  = Math.max(4,  10 - (sid - 2) * 1.0);
+      halleyTimer = base + Math.random() * rng;
+    }
+  }
+  halleys=[];
   ufoSpawnTimer=8+Math.random()*10;
   astronautSpawnTimer=30+Math.random()*25;
   // ブラックホール初回出現タイマー：ミッションが進むほど早く出現

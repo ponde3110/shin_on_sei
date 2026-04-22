@@ -761,24 +761,42 @@ function getBlockForStage(stageId) {
 }
 
 // ── playBgm：心音再生（example.html の bgm.src 切替方式と同じ）──
+let _bgmPlayPromise = null; // play()の返値を追跡してiOSのpause競合を防ぐ
 function playBgm(soundFile) {
   if (!soundFile) return;
   const targetSrc = new URL('sound/' + soundFile, location.href).href;
-  // すでに同じファイルが再生中なら何もしない（example.html と同じ判定）
-  if (bgm.src === targetSrc && !bgm.paused) return;
-  // src が違う場合のみ切り替え
+  // すでに同じファイルが再生中なら何もしない
+  if (currentBgmFile === soundFile && !bgm.paused) return;
+  // srcが違う場合のみ切り替え
   if (bgm.src !== targetSrc) bgm.src = 'sound/' + soundFile;
   bgm.loop = true;
   bgm.volume = 0.55;
   bgm.currentTime = 0;
-  bgm.play().catch(() => {});
+  // iOS対応：play()のPromiseを保存しておく（pause競合防止）
+  _bgmPlayPromise = bgm.play();
+  if (_bgmPlayPromise) {
+    _bgmPlayPromise.catch(() => {});
+    _bgmPlayPromise.then(() => { _bgmPlayPromise = null; }).catch(() => { _bgmPlayPromise = null; });
+  }
   currentBgmFile = soundFile;
 }
 
 // ── stopBgm ──
 function stopBgm() {
-  bgm.pause();
-  bgm.currentTime = 0;
+  // iOS: play()が完了する前にpause()を呼ぶとAbortErrorになる
+  // play()の返値Promiseを保存し、それが解決してからpauseする
+  if (_bgmPlayPromise) {
+    _bgmPlayPromise.then(() => {
+      bgm.pause();
+      bgm.currentTime = 0;
+      try { bgm.removeAttribute('src'); bgm.load(); } catch(e) {}
+    }).catch(() => {});
+    _bgmPlayPromise = null;
+  } else {
+    bgm.pause();
+    bgm.currentTime = 0;
+    try { bgm.removeAttribute('src'); bgm.load(); } catch(e) {}
+  }
   currentBgmFile = null;
 }
 
@@ -791,8 +809,26 @@ function getAC() {
 let _launchSoundNode = null;
 function playLaunchSound() {
   stopLaunchSound();
+  // iOS対応：AudioContextがない or suspendedなら resume してから再生
+  if (!_audioCtx) {
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  const _doPlayLaunch = () => {
+    try {
+      const ac = _audioCtx;
+      if (!ac || ac.state === 'suspended') return; // まだ起きていなければ諦める
+      _playLaunchSoundNow(ac);
+    } catch(e) {}
+  };
+  if (_audioCtx.state === 'suspended') {
+    _audioCtx.resume().then(_doPlayLaunch).catch(_doPlayLaunch);
+  } else {
+    _doPlayLaunch();
+  }
+}
+function _playLaunchSoundNow(ac) {
+  stopLaunchSound();
   try {
-    const ac = getAC();
     const gain = ac.createGain();
     gain.gain.setValueAtTime(0, ac.currentTime);
     gain.gain.linearRampToValueAtTime(0.04, ac.currentTime + 0.4);
@@ -3739,16 +3775,22 @@ function drawProgressMap(completedMissions, yOffset){
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.roundRect(6, mapY, W - 12, mapH, 8); ctx.stroke();
 
-  ctx.fillStyle = 'rgba(180,220,255,0.7)';
+  // 「航路マップ（クリア面は選択可）」を全体として中央揃えで描画
   ctx.font = "bold 8px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
-  ctx.textAlign = 'center';
-  ctx.fillText('航路マップ', W/2, mapY + 11);
-  // 右側に補足テキスト（航路マップ文字幅の右端から始める）
   const titleW = ctx.measureText('航路マップ').width;
-  ctx.fillStyle = 'rgba(160,200,255,0.55)';
   ctx.font = "6px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
+  const subW = ctx.measureText('（クリア面は選択可）').width;
+  const _gap = 2;
+  const textStartX = W/2 - (titleW + _gap + subW) / 2;
+
   ctx.textAlign = 'left';
-  ctx.fillText('（クリア面は選択可）', W/2 + titleW/2 + 3, mapY + 11);
+  ctx.font = "bold 8px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
+  ctx.fillStyle = 'rgba(180,220,255,0.7)';
+  ctx.fillText('航路マップ', textStartX, mapY + 11);
+
+  ctx.font = "6px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
+  ctx.fillStyle = 'rgba(160,200,255,0.55)';
+  ctx.fillText('（クリア面は選択可）', textStartX + titleW + _gap, mapY + 11);
   ctx.textAlign = 'center';
 
   const N = 8;
@@ -4073,8 +4115,10 @@ function loop(ts){
   const dt=Math.min((ts-lastTime)/1000,0.05);
   lastTime=ts;
 
+let _launchSoundPlayed = false;
+
   if(state==='launch_anim'){
-    if(launchT === 0 && dt > 0) playLaunchSound();
+    if(!_launchSoundPlayed){ _launchSoundPlayed = true; playLaunchSound(); }
     launchT=Math.min(1,launchT+dt/LAUNCH_DUR);
     starScroll+=dt*30;
     for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life-=dt/p.maxLife;}
@@ -4543,6 +4587,7 @@ function startStage(idx){
   spawnTimer=1.5; hitFlash=0; pickupFlash=0; shakeX=0; shakeY=0;
   launchT=0; arriveT=0; bgDestLastR=0; bgDestLastY=0;
   starScroll=0; state='launch_anim';
+  _launchSoundPlayed = false;
   shootingStars=[]; shootingStarTimer=1+Math.random()*3;
   { // ハレー彗星タイマー初期値（ミッション1は使わない、2以降はidに応じて短縮）
     const sid = STAGES[idx] ? STAGES[idx].id : 1;
@@ -4631,11 +4676,17 @@ function getClickedStage(mx, my){
 // =========================
 // ステージ開始（統一）
 // =========================
-async function startFromMap(stage){
+function startFromMap(stage){
   stageIdx = stage;
 
-  // AudioContext の resume() が完了するまで待ってからアニメ開始
-  await unlockAudio();
+  // AudioContext のアンロックは非同期で行い、UIとゲーム開始は即座に実行する。
+  // await すると iOS で2度タップが必要になるため、Promise を待機しない。
+  if (!_audioCtx) {
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (_audioCtx.state === 'suspended') {
+    _audioCtx.resume().catch(() => {});
+  }
 
   // UI非表示
   startBtn.classList.add('hidden');
@@ -4698,11 +4749,18 @@ document.addEventListener('keyup',e=>{
 // =========================
 // タッチ開始（統一版）
 // =========================
-cv.addEventListener('touchstart', async (e) => {
+cv.addEventListener('touchstart', (e) => {
   e.preventDefault();
-  await unlockAudio();
-  // タッチ操作の同期コールスタック内で bgm.play() を呼んで再生許可済みにする
-  bgm.play().catch(() => {});
+  // unlockAudio はPromiseを返すが await しない。
+  // iOS では async/await で待機するとジェスチャースコープが失われ、
+  // 最初のタップがアンロックだけに消費されて2度タップが必要になる。
+  // AudioContext のアンロックはバックグラウンドで行い、アクションは即座に実行する。
+  if (!_audioCtx) {
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (_audioCtx.state === 'suspended') {
+    _audioCtx.resume().catch(() => {});
+  }
 
   const t = e.touches[0];
   if(!t) return;
@@ -4763,10 +4821,14 @@ cv.addEventListener('touchend',e=>{
 // =========================
 // クリック（修正版）
 // =========================
-cv.addEventListener('click', async (e) => {
-  // クリック操作で bgm を再生許可済みにする（Autoplay Policy対策）
-  await unlockAudio();
-  bgm.play().catch(() => {});
+cv.addEventListener('click', (e) => {
+  // AudioContext のアンロック（待機しない）
+  if (!_audioCtx) {
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (_audioCtx.state === 'suspended') {
+    _audioCtx.resume().catch(() => {});
+  }
 
   // プレイ中、またはアニメーション演出中は無視
   if (state === 'playing' || isAnim()) return;
@@ -4803,11 +4865,16 @@ cv.addEventListener('click', async (e) => {
 // ==========================================
 // 1. スタートボタンのクリックイベント修正
 // ==========================================
-document.getElementById('startBtn').addEventListener('pointerdown', async (e) => {
+document.getElementById('startBtn').addEventListener('pointerdown', (e) => {
   e.stopPropagation();
-  e.preventDefault();   // ← これを追加
-  await unlockAudio();
-  bgm.play().catch(() => {});
+  e.preventDefault();
+  // AudioContext のアンロックは待機せず即実行（await すると iOS で2度タップになる）
+  if (!_audioCtx) {
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (_audioCtx.state === 'suspended') {
+    _audioCtx.resume().catch(() => {});
+  }
 
   if (state === 'stage_clear') {
     stageIdx++;
@@ -5229,8 +5296,13 @@ document.addEventListener('visibilitychange', () => {
   } else {
     // Web Audio API を再開してから BGM を再開
     const doResumeBgm = () => {
-      if (currentBgm && currentBgm.paused && currentBgmFile) {
-        currentBgm.play().catch(() => {});
+      // currentBgmFile があるときだけ再開（stopBgm後は再開しない）
+      if (currentBgmFile && currentBgm && currentBgm.paused) {
+        _bgmPlayPromise = currentBgm.play();
+        if (_bgmPlayPromise) {
+          _bgmPlayPromise.catch(() => {});
+          _bgmPlayPromise.then(() => { _bgmPlayPromise = null; }).catch(() => { _bgmPlayPromise = null; });
+        }
       }
     };
     if (_audioCtx && _audioCtx.state === 'suspended') {

@@ -55,21 +55,27 @@ html, body {
   bottom: 33%;
   z-index: 10;
 
-  white-space: pre-line;
-  min-width: 140px;
+  /* ===== レイアウト制御（ここが重要）===== */
+  display: inline-block;
+  white-space: nowrap;          /* ← メインテキストを1行固定 */
   text-align: center;
+  min-width: 180px;
 
   padding: 12px 28px;
+
+  /* ===== 文字 ===== */
   font-size: 16px;
   font-weight: 800;
   letter-spacing: 2px;
-  line-height: 1.45;
+  line-height: 1.3;
 
   color: #ffffff;
+
+  /* ===== 見た目 ===== */
   border: 1px solid rgba(255,255,255,0.18);
   border-radius: 999px;
   cursor: pointer;
-  overflow: visible;
+  overflow: hidden;             /* はみ出し防止 */
 
   background:
     radial-gradient(circle at 50% 35%,
@@ -90,9 +96,19 @@ html, body {
   animation: cosmicLaunch 2.5s infinite ease-in-out;
 }
 
+/* ===== コメント（2行目）を下に表示 ===== */
+#startBtn span {
+  display: block;       /* ← これで必ず下に配置 */
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  opacity: 0.88;
+  margin-top: 2px;
+}
+
 #heartPlanetWrap {
   position: absolute;
-  top: 30%;
+  top: 27%;
   left: 50%;
   transform: translateX(-50%);
   width: 160px;
@@ -2831,7 +2847,7 @@ function drawStartScreen() {
   ctx.fillRect(0, 0, W, H);
 
   // --- 上部：タイトルエリア ---
-  const titleY = H * 0.20;
+  const titleY = H * 0.17;
 
   // タイトル光輪
   const glow = ctx.createRadialGradient(W/2, titleY, 0, W/2, titleY, 90);
@@ -4787,8 +4803,9 @@ cv.addEventListener('click', async (e) => {
 // ==========================================
 // 1. スタートボタンのクリックイベント修正
 // ==========================================
-document.getElementById('startBtn').addEventListener('click', async (e) => {
+document.getElementById('startBtn').addEventListener('pointerdown', async (e) => {
   e.stopPropagation();
+  e.preventDefault();   // ← これを追加
   await unlockAudio();
   bgm.play().catch(() => {});
 

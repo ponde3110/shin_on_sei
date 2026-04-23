@@ -731,24 +731,24 @@ let _bgmPlayPromise = null;    // play() の返値を追跡して iOS の AbortE
 
 // ── Web Audio API（SE 用） ──
 let _audioCtx = null;
-let _audioCtxReady = Promise.resolve(); // resume() 完了を追跡する Promise
 
 // ユーザー操作時に呼び出す。AudioContext の生成とアンロックを一元化する。
+// ジェスチャーコールスタック内で同期的に呼ぶこと（await 禁止）。
 function unlockAudio() {
   if (!_audioCtx) {
-    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { return; }
   }
-  // 既に running なら何もしない（_audioCtxReady を上書きしない）
   if (_audioCtx.state === 'running') return;
   if (_audioCtx.state === 'suspended') {
-    // 無音バッファを再生してブラウザのオーディオロックを解除する（iOS 対策）
-    const buf = _audioCtx.createBuffer(1, 1, 22050);
-    const src = _audioCtx.createBufferSource();
-    src.buffer = buf;
-    src.connect(_audioCtx.destination);
-    src.start(0);
-    // resume() の完了を Promise に保存し、SE 再生側から待てるようにする
-    _audioCtxReady = _audioCtx.resume().catch(() => {});
+    // 無音バッファを start() してから resume()（iOS で最も確実な方法）
+    try {
+      const buf = _audioCtx.createBuffer(1, 1, _audioCtx.sampleRate || 22050);
+      const src = _audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(_audioCtx.destination);
+      src.start(0);
+    } catch(e) {}
+    _audioCtx.resume().catch(() => {});
   }
 }
 
@@ -808,77 +808,96 @@ function getAC() {
   return _audioCtx;
 }
 
-// ── 発射音：ロケット噴射（低周波ノイズ＋鋸波オシレータ） ──
-let _launchSoundNode  = null;
-let _launchSoundPlayed = false; // 1ステージで1回だけ再生するフラグ
+// ── 発射音：ロケット噴射 ──
+// OfflineAudioContext でページロード時に合成 → WAV Blob URL → <audio> 要素で再生。
+// Web Audio API の resume() 非同期問題（iOS）を完全に回避する。
+
+const _launchAudio = new Audio();
+_launchAudio.volume = 1.0;
+let _launchSoundPlayed = false;
+
+// Float32Array → 16bit PCM WAV Blob URL を生成するユーティリティ
+function _floatToPCM16WavBlobUrl(samples, sampleRate) {
+  const numSamples = samples.length;
+  const buffer = new ArrayBuffer(44 + numSamples * 2);
+  const view = new DataView(buffer);
+  const write = (offset, str) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); };
+  write(0, 'RIFF');
+  view.setUint32(4,  36 + numSamples * 2, true);
+  write(8, 'WAVE');
+  write(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20,  1, true);   // PCM
+  view.setUint16(22,  1, true);   // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32,  2, true);
+  view.setUint16(34, 16, true);
+  write(36, 'data');
+  view.setUint32(40, numSamples * 2, true);
+  for (let i = 0; i < numSamples; i++) {
+    view.setInt16(44 + i * 2, Math.max(-32768, Math.min(32767, samples[i] * 32767)), true);
+  }
+  return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
+}
+
+// ページロード時にバックグラウンドで合成（ユーザー操作不要・AudioContext.resume不要）
+(function _buildLaunchSound() {
+  const SR = 22050;
+  const DUR = 5.5;
+  const N = Math.ceil(SR * DUR);
+  try {
+    const oc = new OfflineAudioContext(1, N, SR);
+
+    // ノイズ（ローパスフィルタ通し）
+    const noiseBuf = oc.createBuffer(1, N, SR);
+    const noiseData = noiseBuf.getChannelData(0);
+    for (let i = 0; i < N; i++) noiseData[i] = Math.random() * 2 - 1;
+    const noiseSrc = oc.createBufferSource();
+    noiseSrc.buffer = noiseBuf;
+    const lp = oc.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(220, 0);
+    lp.frequency.linearRampToValueAtTime(480, 5.0);
+    lp.Q.value = 1.5;
+    const noiseGain = oc.createGain();
+    noiseGain.gain.setValueAtTime(0, 0);
+    noiseGain.gain.linearRampToValueAtTime(0.04, 0.4);
+    noiseGain.gain.setValueAtTime(0.04, 3.5);
+    noiseGain.gain.linearRampToValueAtTime(0, 5.0);
+    noiseSrc.connect(lp); lp.connect(noiseGain); noiseGain.connect(oc.destination);
+    noiseSrc.start(0);
+
+    // 鋸波オシレータ
+    const osc = oc.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(55, 0);
+    osc.frequency.linearRampToValueAtTime(90, 4.0);
+    const oscGain = oc.createGain();
+    oscGain.gain.setValueAtTime(0, 0);
+    oscGain.gain.linearRampToValueAtTime(0.015, 0.6);
+    oscGain.gain.linearRampToValueAtTime(0, 5.0);
+    osc.connect(oscGain); oscGain.connect(oc.destination);
+    osc.start(0); osc.stop(5.5);
+
+    oc.startRendering().then(rendered => {
+      const url = _floatToPCM16WavBlobUrl(rendered.getChannelData(0), SR);
+      _launchAudio.src = url;
+      _launchAudio.load();
+    }).catch(() => {});
+  } catch(e) {}
+})();
 
 function playLaunchSound() {
-  console.log('[launch] called. played=', _launchSoundPlayed, 'ac=', _audioCtx ? _audioCtx.state : 'null');
   if (_launchSoundPlayed) return;
-  stopLaunchSound();
-
-  if (!_audioCtx) {
-    console.warn('[launch] _audioCtx is null — calling unlockAudio()');
-    unlockAudio();
-  }
-  const ac = _audioCtx;
-  console.log('[launch] ac.state=', ac ? ac.state : 'null');
-  if (!ac) return;
-
   _launchSoundPlayed = true;
-
-  const doPlay = () => {
-    try {
-      const now = ac.currentTime;
-      console.log('[launch] scheduled. now=', now);
-
-      const gain = ac.createGain();
-      gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(0.04, now + 0.4);
-      gain.gain.setValueAtTime(0.04, now + 3.5);
-      gain.gain.linearRampToValueAtTime(0, now + 5.0);
-      gain.connect(ac.destination);
-
-      const bufLen = ac.sampleRate * 5.5;
-      const buf    = ac.createBuffer(1, bufLen, ac.sampleRate);
-      const data   = buf.getChannelData(0);
-      for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
-      const noise = ac.createBufferSource();
-      noise.buffer = buf;
-      const lp = ac.createBiquadFilter();
-      lp.type = 'lowpass';
-      lp.frequency.setValueAtTime(220, now);
-      lp.frequency.linearRampToValueAtTime(480, now + 5.0);
-      lp.Q.value = 1.5;
-      noise.connect(lp); lp.connect(gain);
-      noise.start();
-
-      const osc = ac.createOscillator();
-      const og  = ac.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(55, now);
-      osc.frequency.linearRampToValueAtTime(90, now + 4.0);
-      og.gain.setValueAtTime(0, now);
-      og.gain.linearRampToValueAtTime(0.015, now + 0.6);
-      og.gain.linearRampToValueAtTime(0, now + 5.0);
-      osc.connect(og); og.connect(ac.destination);
-      osc.start(); osc.stop(now + 5.5);
-
-      _launchSoundNode = { noise, gain, osc, og };
-    } catch(e) {
-      console.error('[launch] error:', e);
-    }
-  };
-
-  // resume() 完了を待ってから ac.currentTime を取得して音を組み立てる
-  _audioCtxReady.then(doPlay).catch(() => {});
+  _launchAudio.currentTime = 0;
+  _launchAudio.play().catch(() => {});
 }
 
 function stopLaunchSound() {
-  if (!_launchSoundNode) return;
-  try { _launchSoundNode.noise.stop(); } catch(e) {}
-  try { _launchSoundNode.osc.stop();   } catch(e) {}
-  _launchSoundNode = null;
+  _launchAudio.pause();
+  _launchAudio.currentTime = 0;
 }
 
 // 到着：空気を切り裂くホイッスル降下＋衝撃ドン

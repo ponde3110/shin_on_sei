@@ -815,54 +815,52 @@ function playLaunchSound() {
   stopLaunchSound();
   const ac = getAC();
   if (!ac) return;
+  _launchSoundPlayed = true;
 
-  _launchSoundPlayed = true; // resume 待ち中の二重起動を防ぐため先にセット
+  // iOS では resume() 完了前に ac.currentTime が 0 のまま進まない。
+  // Promise チェーンに頼らず、開始時刻に固定オフセットを乗せることで
+  // resume 完了までの遅延（~数百ms）をバッファとして吸収する。
+  if (ac.state === 'suspended') ac.resume().catch(() => {});
+  try {
+    const OFFSET = 0.5; // resume 完了を待つ余裕（秒）
+    const now = ac.currentTime + OFFSET;
 
-  const doPlay = () => {
-    try {
-      const now = ac.currentTime;
-      // ノイズ成分（低域ローパス）
-      const gain = ac.createGain();
-      gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(0.04, now + 0.4);
-      gain.gain.setValueAtTime(0.04, now + 3.5);
-      gain.gain.linearRampToValueAtTime(0, now + 5.0);
-      gain.connect(ac.destination);
+    // ノイズ成分（低域ローパス）
+    const gain = ac.createGain();
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.04, now + 0.4);
+    gain.gain.setValueAtTime(0.04, now + 3.5);
+    gain.gain.linearRampToValueAtTime(0, now + 5.0);
+    gain.connect(ac.destination);
 
-      const bufLen = ac.sampleRate * 5.5;
-      const buf    = ac.createBuffer(1, bufLen, ac.sampleRate);
-      const data   = buf.getChannelData(0);
-      for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
-      const noise = ac.createBufferSource();
-      noise.buffer = buf;
-      const lp = ac.createBiquadFilter();
-      lp.type = 'lowpass';
-      lp.frequency.setValueAtTime(220, now);
-      lp.frequency.linearRampToValueAtTime(480, now + 5.0);
-      lp.Q.value = 1.5;
-      noise.connect(lp); lp.connect(gain);
-      noise.start();
+    const bufLen = ac.sampleRate * 5.5;
+    const buf    = ac.createBuffer(1, bufLen, ac.sampleRate);
+    const data   = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+    const noise = ac.createBufferSource();
+    noise.buffer = buf;
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(220, now);
+    lp.frequency.linearRampToValueAtTime(480, now + 5.0);
+    lp.Q.value = 1.5;
+    noise.connect(lp); lp.connect(gain);
+    noise.start(now);
 
-      // オシレータ成分（鋸波）
-      const osc = ac.createOscillator();
-      const og  = ac.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(55, now);
-      osc.frequency.linearRampToValueAtTime(90, now + 4.0);
-      og.gain.setValueAtTime(0, now);
-      og.gain.linearRampToValueAtTime(0.015, now + 0.6);
-      og.gain.linearRampToValueAtTime(0, now + 5.0);
-      osc.connect(og); og.connect(ac.destination);
-      osc.start(); osc.stop(now + 5.5);
+    // オシレータ成分（鋸波）
+    const osc = ac.createOscillator();
+    const og  = ac.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(55, now);
+    osc.frequency.linearRampToValueAtTime(90, now + 4.0);
+    og.gain.setValueAtTime(0, now);
+    og.gain.linearRampToValueAtTime(0.015, now + 0.6);
+    og.gain.linearRampToValueAtTime(0, now + 5.0);
+    osc.connect(og); og.connect(ac.destination);
+    osc.start(now); osc.stop(now + 5.5);
 
-      _launchSoundNode = { noise, gain, osc, og };
-    } catch(e) {}
-  };
-
-  // _audioCtxReady（unlockAudio の resume 完了 Promise）を待ってから再生する。
-  // iOS では bgm.play() と resume() が競合して resume が遅延することがあるため、
-  // 完了が確定してから ac.currentTime を取得しないと初回だけ音が鳴らない。
-  _audioCtxReady.then(doPlay).catch(() => {});
+    _launchSoundNode = { noise, gain, osc, og };
+  } catch(e) {}
 }
 
 function stopLaunchSound() {

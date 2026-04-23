@@ -808,85 +808,11 @@ function getAC() {
   return _audioCtx;
 }
 
-// ── 発射音：ロケット噴射 ──
-// OfflineAudioContext でページロード時に合成 → WAV Blob URL → <audio> 要素で再生。
-// Web Audio API の resume() 非同期問題（iOS）を完全に回避する。
-
-const _launchAudio = new Audio();
+// ── 発射音：ロケット噴射（launch.mp3） ──
+const _launchAudio = new Audio('launch.mp3');
 _launchAudio.volume = 1.0;
+_launchAudio.preload = 'auto';
 let _launchSoundPlayed = false;
-
-// Float32Array → 16bit PCM WAV Blob URL を生成するユーティリティ
-function _floatToPCM16WavBlobUrl(samples, sampleRate) {
-  const numSamples = samples.length;
-  const buffer = new ArrayBuffer(44 + numSamples * 2);
-  const view = new DataView(buffer);
-  const write = (offset, str) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); };
-  write(0, 'RIFF');
-  view.setUint32(4,  36 + numSamples * 2, true);
-  write(8, 'WAVE');
-  write(12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20,  1, true);   // PCM
-  view.setUint16(22,  1, true);   // mono
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32,  2, true);
-  view.setUint16(34, 16, true);
-  write(36, 'data');
-  view.setUint32(40, numSamples * 2, true);
-  for (let i = 0; i < numSamples; i++) {
-    view.setInt16(44 + i * 2, Math.max(-32768, Math.min(32767, samples[i] * 32767)), true);
-  }
-  return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
-}
-
-// ページロード時にバックグラウンドで合成（ユーザー操作不要・AudioContext.resume不要）
-(function _buildLaunchSound() {
-  const SR = 22050;
-  const DUR = 5.5;
-  const N = Math.ceil(SR * DUR);
-  try {
-    const oc = new OfflineAudioContext(1, N, SR);
-
-    // ノイズ（ローパスフィルタ通し）
-    const noiseBuf = oc.createBuffer(1, N, SR);
-    const noiseData = noiseBuf.getChannelData(0);
-    for (let i = 0; i < N; i++) noiseData[i] = Math.random() * 2 - 1;
-    const noiseSrc = oc.createBufferSource();
-    noiseSrc.buffer = noiseBuf;
-    const lp = oc.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(220, 0);
-    lp.frequency.linearRampToValueAtTime(480, 5.0);
-    lp.Q.value = 1.5;
-    const noiseGain = oc.createGain();
-    noiseGain.gain.setValueAtTime(0, 0);
-    noiseGain.gain.linearRampToValueAtTime(0.04, 0.4);
-    noiseGain.gain.setValueAtTime(0.04, 3.5);
-    noiseGain.gain.linearRampToValueAtTime(0, 5.0);
-    noiseSrc.connect(lp); lp.connect(noiseGain); noiseGain.connect(oc.destination);
-    noiseSrc.start(0);
-
-    // 鋸波オシレータ
-    const osc = oc.createOscillator();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(55, 0);
-    osc.frequency.linearRampToValueAtTime(90, 4.0);
-    const oscGain = oc.createGain();
-    oscGain.gain.setValueAtTime(0, 0);
-    oscGain.gain.linearRampToValueAtTime(0.015, 0.6);
-    oscGain.gain.linearRampToValueAtTime(0, 5.0);
-    osc.connect(oscGain); oscGain.connect(oc.destination);
-    osc.start(0); osc.stop(5.5);
-
-    oc.startRendering().then(rendered => {
-      const url = _floatToPCM16WavBlobUrl(rendered.getChannelData(0), SR);
-      _launchAudio.src = url;
-      _launchAudio.load();
-    }).catch(() => {});
-  } catch(e) {}
-})();
 
 function playLaunchSound() {
   if (_launchSoundPlayed) return;

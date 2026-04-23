@@ -734,17 +734,35 @@ let _bgmGainNode   = null;
 const _bgmBufferCache = {};
 function _stopBgmWebAudio() {}
 function _playBgmWebAudio(f) { playBgm(f); }
+
 // ===== Web Audio SE =====
 let _audioCtx = null;
 function unlockAudio() {
-  // AudioContext（SE用）がまだ未生成なら、ユーザージェスチャーのタイミングで生成する
+  // 1. AudioContextの生成/取得
   if (!_audioCtx) {
     _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
-  // suspended なら resume し、完了まで待てるよう Promise を返す
+
+  // 2. iOS/Safari対策：無音のバッファを再生して「再生のトリガー」を確定させる
+  // これにより、以降の Web Audio API による再生が許可されます
   if (_audioCtx.state === 'suspended') {
+    const buffer = _audioCtx.createBuffer(1, 1, 22050);
+    const source = _audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(_audioCtx.destination);
+    
+    // start() を呼び出すことでブラウザのオーディオロックを解除
+    if (source.start) {
+      source.start(0);
+    } else if (source.noteOn) {
+      source.noteOn(0);
+    }
+
+    // resume() を実行し、完了を待つ Promise を返す
     return _audioCtx.resume();
   }
+
+  // すでに running の場合はそのまま解決
   return Promise.resolve();
 }
 
@@ -806,65 +824,109 @@ function getAC() {
 }
 
 // 出発：ロケット噴射音（低周波ノイズ＋轟音ロール）
+// ===== Web Audio SE 安定化版 =====
 let _launchSoundNode = null;
+let _launchSoundPlayed = false; // 二重再生防止フラグ
+
 function playLaunchSound() {
+  // すでにこの発射シークエンスで再生済みなら何もしない
+  if (_launchSoundPlayed) return;
+
   stopLaunchSound();
-  // iOS対応：AudioContextがない or suspendedなら resume してから再生
+
   if (!_audioCtx) {
     _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
+
+  const ac = _audioCtx;
+
+  // 再生用の内部関数
   const _doPlayLaunch = () => {
     try {
-      const ac = _audioCtx;
-      if (!ac || ac.state === 'suspended') return; // まだ起きていなければ諦める
-      _playLaunchSoundNow(ac);
-    } catch(e) {}
+      if (!ac || ac.state === 'suspended') {
+        // まだ停止中ならもう一度だけ resume を試みる（iPhone対策）
+        ac.resume().then(() => _playLaunchSoundNow(ac)).catch(() => {});
+      } else {
+        _playLaunchSoundNow(ac);
+      }
+      _launchSoundPlayed = true; // 再生成功フラグを立てる
+    } catch(e) {
+      console.error("Launch sound error:", e);
+    }
   };
-  if (_audioCtx.state === 'suspended') {
-    _audioCtx.resume().then(_doPlayLaunch).catch(_doPlayLaunch);
+
+  // 状態に応じて再生を実行
+  if (ac.state === 'suspended') {
+    ac.resume().then(_doPlayLaunch).catch(_doPlayLaunch);
   } else {
     _doPlayLaunch();
   }
 }
+
 function _playLaunchSoundNow(ac) {
+  // 念のため直前の音を止める
   stopLaunchSound();
+  
   try {
     const gain = ac.createGain();
+    // iPhoneのスピーカー保護のため、急激な音量変化を避けつつ設定
     gain.gain.setValueAtTime(0, ac.currentTime);
     gain.gain.linearRampToValueAtTime(0.04, ac.currentTime + 0.4);
     gain.gain.setValueAtTime(0.04, ac.currentTime + 3.5);
     gain.gain.linearRampToValueAtTime(0, ac.currentTime + 5.0);
     gain.connect(ac.destination);
+
     const bufLen = ac.sampleRate * 5.5;
     const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
     const data = buf.getChannelData(0);
     for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+
     const noise = ac.createBufferSource();
     noise.buffer = buf;
+
     const lp = ac.createBiquadFilter();
     lp.type = 'lowpass';
     lp.frequency.setValueAtTime(220, ac.currentTime);
     lp.frequency.linearRampToValueAtTime(480, ac.currentTime + 5.0);
     lp.Q.value = 1.5;
-    noise.connect(lp); lp.connect(gain);
+
+    noise.connect(lp);
+    lp.connect(gain);
     noise.start();
-    _launchSoundNode = { noise, gain };
+
+    // オシレーターによる低音の追加
     const osc = ac.createOscillator();
     const og = ac.createGain();
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(55, ac.currentTime);
     osc.frequency.linearRampToValueAtTime(90, ac.currentTime + 4.0);
+
     og.gain.setValueAtTime(0, ac.currentTime);
     og.gain.linearRampToValueAtTime(0.015, ac.currentTime + 0.6);
     og.gain.linearRampToValueAtTime(0, ac.currentTime + 5.0);
-    osc.connect(og); og.connect(ac.destination);
-    osc.start(); osc.stop(ac.currentTime + 5.5);
-  } catch(e) {}
+
+    osc.connect(og);
+    og.connect(ac.destination);
+    osc.start();
+    osc.stop(ac.currentTime + 5.5);
+
+    // 停止制御用に保存（オシレーターは自動停止するのでnoiseとgainのみ）
+    _launchSoundNode = { noise, gain, osc, og };
+  } catch(e) {
+    console.warn("AudioBuffer expansion failed:", e);
+  }
 }
+
 function stopLaunchSound() {
   try {
-    if (_launchSoundNode) { _launchSoundNode.noise.stop(); _launchSoundNode = null; }
-  } catch(e) { _launchSoundNode = null; }
+    if (_launchSoundNode) {
+      if (_launchSoundNode.noise) _launchSoundNode.noise.stop();
+      if (_launchSoundNode.osc) _launchSoundNode.osc.stop();
+      _launchSoundNode = null;
+    }
+  } catch(e) {
+    _launchSoundNode = null;
+  }
 }
 
 // 到着：空気を切り裂くホイッスル降下＋衝撃ドン
@@ -4111,7 +4173,6 @@ function checkHalleyCollisions(){
   }
 }
 
-let _launchSoundPlayed = false;
 function loop(ts){
   const dt=Math.min((ts-lastTime)/1000,0.05);
   lastTime=ts;
@@ -4889,13 +4950,27 @@ cv.addEventListener('click', (e) => {
 document.getElementById('startBtn').addEventListener('pointerdown', (e) => {
   e.stopPropagation();
   e.preventDefault();
-  // AudioContext のアンロックは待機せず即実行（await すると iOS で2度タップになる）
+
+  // --- iPhone/iOS オーディオ制限解除の強化 ---
   if (!_audioCtx) {
     _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
-  if (_audioCtx.state === 'suspended') {
+  
+  // iOS Safariでは resume() だけでなく、実際に音を出す操作をしないとロックが解けない場合がある
+  if (_audioCtx.state === 'suspended' || _audioCtx.state === 'interrupted') {
+    // 1x1の無音バッファを生成して再生
+    const buffer = _audioCtx.createBuffer(1, 1, 22050);
+    const source = _audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(_audioCtx.destination);
+    source.start(0);
+    
     _audioCtx.resume().catch(() => {});
   }
+
+  // 発射音フラグをリセット（これをしないと2回目以降の発射時に音が鳴らなくなる）
+  _launchSoundPlayed = false;
+  // ------------------------------------------
 
   if (state === 'stage_clear') {
     stageIdx++;
@@ -4917,13 +4992,17 @@ document.getElementById('startBtn').addEventListener('pointerdown', (e) => {
   document.getElementById('startBtn').classList.add('hidden');
   const hpw = document.getElementById('heartPlanetWrap');
   if(hpw) hpw.style.display = 'none';
-});
+}, { passive: false });
 
 // handleStart関数を上書きして、キーボードや画面クリックで開始した際も隠れるようにする
 const originalHandleStart = handleStart;
 handleStart = function() {
+  // ここでも一応フラグをリセットしておくと安全
+  _launchSoundPlayed = false;
+  
   document.getElementById('startBtn').classList.add('hidden');
-  document.getElementById('heartPlanetWrap').style.display = 'none';
+  const hpw = document.getElementById('heartPlanetWrap');
+  if(hpw) hpw.style.display = 'none';
   originalHandleStart();
 };
 

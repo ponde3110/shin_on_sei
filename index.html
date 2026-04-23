@@ -821,8 +821,8 @@ function _triggerLaunchAudio() {
     _launchAudio.pause();
     _launchAudio.currentTime = 0;
     _launchAudio.volume = 1.0;
-    // Android Chrome: load() を呼んでからすぐ play() するとユーザージェスチャーが維持される
-    _launchAudio.load();
+    // load() を呼ぶとジェスチャーコンテキストが非同期になりAndroidでブロックされる。
+    // currentTime リセットだけで十分（src は HTML側で preload="auto" 済み）。
     const p = _launchAudio.play();
     if (p) p.catch(() => {});
   } catch(e) {}
@@ -4823,12 +4823,20 @@ cv.addEventListener('click', (e) => {
 document.getElementById('startBtn').addEventListener('pointerdown', (e) => {
   e.stopPropagation();
   e.preventDefault();
+
+  // Android 対策：ジェスチャーコールスタックの先頭で AudioContext と
+  // HTMLMediaElement の両方をアンロックし、その直後（同期的）に
+  // _triggerLaunchAudio() を呼ぶ。間に非同期処理を挟まない。
+  unlockAudio();
+
   // --- ゲーム開始処理 ---
   let willLaunch = true;
   if (state === 'stage_clear') {
     stageIdx++;
     if (stageIdx < STAGES.length) {
       startFromMap(stageIdx);
+      // startFromMap 内で _triggerLaunchAudio() が呼ばれるため、ここでは呼ばない
+      willLaunch = false;
     } else {
       state = 'all_clear';
       updateBtn();
@@ -4841,6 +4849,12 @@ document.getElementById('startBtn').addEventListener('pointerdown', (e) => {
     handleStart();
   } else {
     handleStart();
+  }
+
+  // handleStart() 経由のとき（start / over / all_clear）は
+  // startFromMap() を通らないため、ここで直接発射音を鳴らす
+  if (willLaunch) {
+    _triggerLaunchAudio();
   }
 
   // UIの非表示処理
@@ -4856,8 +4870,7 @@ handleStart = function() {
   const hpw = document.getElementById('heartPlanetWrap');
   if(hpw) hpw.style.display = 'none';
   originalHandleStart();
-  // ジェスチャーハンドラ内で直接 play()（rAF 経由は Autoplay Policy でブロックされる）
-  _triggerLaunchAudio();
+  // 発射音は pointerdown ハンドラーで直接呼ぶため、ここでは呼ばない
 };
 
 // --- ここまで追記 ---
@@ -5263,12 +5276,6 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-
-// startBtn の pointerdown で AudioContext をアンロックする
-// （キャプチャフェーズで実行し、後続イベントより先に AudioContext を起こす）
-document.getElementById('startBtn').addEventListener('pointerdown', () => {
-  unlockAudio();
-}, true);
 
 lastTime=performance.now();
 requestAnimationFrame(loop);

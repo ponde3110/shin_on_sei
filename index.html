@@ -4073,9 +4073,6 @@ function loop(ts){
 
 if(state==='launch_anim'){
 
-  // 最初のフレームで発射音を再生（playBgm と同じくrAFループ内から呼ぶ）
-  if(launchT === 0) _triggerLaunchAudio();
-
   // アニメーション進行
   launchT = Math.min(1, launchT + dt / LAUNCH_DUR);
   starScroll += dt * 30;
@@ -4659,7 +4656,8 @@ function startFromMap(stage){
   document.getElementById('heartPlanetWrap').style.display = 'none';
 
   startStage(stage);
-  // 発射音はゲームループ（launch_anim の最初フレーム）で再生する
+  // ジェスチャーハンドラ（pointerdown）のコールスタック内なのでplay()が許可される
+  _triggerLaunchAudio();
 }
 
 // =========================
@@ -4856,7 +4854,8 @@ handleStart = function() {
   const hpw = document.getElementById('heartPlanetWrap');
   if(hpw) hpw.style.display = 'none';
   originalHandleStart();
-  // 発射音はゲームループ（launch_anim の最初フレーム）で再生する
+  // ジェスチャーハンドラ内で直接 play()（rAF 経由は Autoplay Policy でブロックされる）
+  _triggerLaunchAudio();
 };
 
 // --- ここまで追記 ---

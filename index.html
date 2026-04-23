@@ -812,11 +812,11 @@ function getAC() {
 const _launchAudio = new Audio('launch.mp3');
 _launchAudio.volume = 1.0;
 _launchAudio.preload = 'auto';
-let _launchSoundPlayed = false;
 
-function playLaunchSound() {
-  if (_launchSoundPlayed) return;
-  _launchSoundPlayed = true;
+// 発射音をジェスチャーハンドラから直接呼ぶ。
+// rAF(requestAnimationFrame)から play() を呼ぶと Autoplay Policy でブロックされるため、
+// タッチ・クリックイベントのコールスタック内でのみ呼び出す。
+function _triggerLaunchAudio() {
   _launchAudio.currentTime = 0;
   _launchAudio.play().catch(() => {});
 }
@@ -4065,10 +4065,6 @@ function loop(ts){
 
 if(state==='launch_anim'){
 
-// 修正：ここではフラグを操作せず、関数を呼ぶだけにする
-  // （関数側の window.playLaunchSound 内で二重再生を防止しているため）
-  playLaunchSound();
-
   // アニメーション進行
   launchT = Math.min(1, launchT + dt / LAUNCH_DUR);
   starScroll += dt * 30;
@@ -4553,7 +4549,6 @@ function startStage(idx){
   spawnTimer=1.5; hitFlash=0; pickupFlash=0; shakeX=0; shakeY=0;
   launchT=0; arriveT=0; bgDestLastR=0; bgDestLastY=0;
   starScroll=0; state='launch_anim';
-  _launchSoundPlayed = false;
   shootingStars=[]; shootingStarTimer=1+Math.random()*3;
   { // ハレー彗星タイマー初期値（ミッション1は使わない、2以降はidに応じて短縮）
     const sid = STAGES[idx] ? STAGES[idx].id : 1;
@@ -4643,11 +4638,9 @@ function getClickedStage(mx, my){
 // ステージ開始（統一）
 // =========================
 function startFromMap(stage){
-  unlockAudio(); // 星クリック経由でも AudioContext を確実にアンロックする
+  unlockAudio();
   stageIdx = stage;
 
-  // AudioContext のアンロックは非同期で行い、UIとゲーム開始は即座に実行する。
-  // await すると iOS で2度タップが必要になるため、Promise を待機しない。
   if (!_audioCtx) {
     _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
@@ -4659,8 +4652,10 @@ function startFromMap(stage){
   startBtn.classList.add('hidden');
   document.getElementById('heartPlanetWrap').style.display = 'none';
 
-  // 既存の開始処理へ
   startStage(stage);
+
+  // ジェスチャーハンドラ内で直接 play() する（rAF 経由だと Autoplay Policy でブロックされる）
+  _triggerLaunchAudio();
 }
 
 // =========================
@@ -4824,9 +4819,6 @@ cv.addEventListener('click', (e) => {
 document.getElementById('startBtn').addEventListener('pointerdown', (e) => {
   e.stopPropagation();
   e.preventDefault();
-  // unlockAudio() と _launchSoundPlayed リセットはキャプチャリスナー側で実施済み
-  
-
   // --- ゲーム開始処理 ---
   if (state === 'stage_clear') {
     stageIdx++;
@@ -4854,11 +4846,12 @@ document.getElementById('startBtn').addEventListener('pointerdown', (e) => {
 // handleStart を上書きして、ゲーム開始時にスタート画面 UI を非表示にする
 const originalHandleStart = handleStart;
 handleStart = function() {
-  _launchSoundPlayed = false; // ステージ開始時にフラグをリセット
   document.getElementById('startBtn').classList.add('hidden');
   const hpw = document.getElementById('heartPlanetWrap');
   if(hpw) hpw.style.display = 'none';
   originalHandleStart();
+  // ジェスチャーハンドラ内で直接 play()（rAF 経由は Autoplay Policy でブロックされる）
+  _triggerLaunchAudio();
 };
 
 // --- ここまで追記 ---
@@ -5269,7 +5262,6 @@ document.addEventListener('visibilitychange', () => {
 // （キャプチャフェーズで実行し、後続イベントより先に AudioContext を起こす）
 document.getElementById('startBtn').addEventListener('pointerdown', () => {
   unlockAudio();
-  _launchSoundPlayed = false; // 新しいゲーム開始前にフラグをリセット
 }, true);
 
 lastTime=performance.now();

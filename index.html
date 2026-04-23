@@ -840,36 +840,33 @@ function playLaunchSound() {
 
   const ac = _audioCtx;
 
-  // 再生用の内部関数
+  // iOS対策：resumeの結果を待ってから再生するのではなく、
+  // resumeをキックしつつ、即座に再生処理を走らせる
   const _doPlayLaunch = () => {
     try {
-      if (!ac || ac.state === 'suspended') {
-        // まだ停止中ならもう一度だけ resume を試みる（iPhone対策）
-        ac.resume().then(() => _playLaunchSoundNow(ac)).catch(() => {});
-      } else {
-        _playLaunchSoundNow(ac);
-      }
-      _launchSoundPlayed = true; // 再生成功フラグを立てる
+      // 再生処理自体がエラーにならないよう try-catch で保護
+      _playLaunchSoundNow(ac);
+      _launchSoundPlayed = true; 
     } catch(e) {
-      console.error("Launch sound error:", e);
+      console.error("Launch sound play error:", e);
     }
   };
 
-  // 状態に応じて再生を実行
   if (ac.state === 'suspended') {
-    ac.resume().then(_doPlayLaunch).catch(_doPlayLaunch);
+    // iPhoneではここの Promise が解決されるのを待つとブロックされることがあるため、
+    // resume()を呼びつつ、そのまま再生処理へ進みます
+    ac.resume().catch(() => {});
+    _doPlayLaunch();
   } else {
     _doPlayLaunch();
   }
 }
 
 function _playLaunchSoundNow(ac) {
-  // 念のため直前の音を止める
   stopLaunchSound();
   
   try {
     const gain = ac.createGain();
-    // iPhoneのスピーカー保護のため、急激な音量変化を避けつつ設定
     gain.gain.setValueAtTime(0, ac.currentTime);
     gain.gain.linearRampToValueAtTime(0.04, ac.currentTime + 0.4);
     gain.gain.setValueAtTime(0.04, ac.currentTime + 3.5);
@@ -894,34 +891,33 @@ function _playLaunchSoundNow(ac) {
     lp.connect(gain);
     noise.start();
 
-    // オシレーターによる低音の追加
     const osc = ac.createOscillator();
     const og = ac.createGain();
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(55, ac.currentTime);
     osc.frequency.linearRampToValueAtTime(90, ac.currentTime + 4.0);
-
     og.gain.setValueAtTime(0, ac.currentTime);
     og.gain.linearRampToValueAtTime(0.015, ac.currentTime + 0.6);
     og.gain.linearRampToValueAtTime(0, ac.currentTime + 5.0);
+    osc.connect(og); og.connect(ac.destination);
+    osc.start(); osc.stop(ac.currentTime + 5.5);
 
-    osc.connect(og);
-    og.connect(ac.destination);
-    osc.start();
-    osc.stop(ac.currentTime + 5.5);
-
-    // 停止制御用に保存（オシレーターは自動停止するのでnoiseとgainのみ）
+    // 停止制御用に保存（ノイズ、オシレーター、各ゲインをまとめて管理）
     _launchSoundNode = { noise, gain, osc, og };
   } catch(e) {
-    console.warn("AudioBuffer expansion failed:", e);
+    console.warn("Audio implementation failed:", e);
   }
 }
 
 function stopLaunchSound() {
   try {
     if (_launchSoundNode) {
-      if (_launchSoundNode.noise) _launchSoundNode.noise.stop();
-      if (_launchSoundNode.osc) _launchSoundNode.osc.stop();
+      if (_launchSoundNode.noise) {
+        try { _launchSoundNode.noise.stop(); } catch(e){}
+      }
+      if (_launchSoundNode.osc) {
+        try { _launchSoundNode.osc.stop(); } catch(e){}
+      }
       _launchSoundNode = null;
     }
   } catch(e) {
@@ -4179,11 +4175,9 @@ function loop(ts){
 
 if(state==='launch_anim'){
 
-  // 1回だけ再生
-  if(!_launchSoundPlayed){
-    _launchSoundPlayed = true;
-    playLaunchSound();
-  }
+// 修正：ここではフラグを操作せず、関数を呼ぶだけにする
+  // （関数側の window.playLaunchSound 内で二重再生を防止しているため）
+  playLaunchSound();
 
   // アニメーション進行
   launchT = Math.min(1, launchT + dt / LAUNCH_DUR);
@@ -4952,26 +4946,31 @@ document.getElementById('startBtn').addEventListener('pointerdown', (e) => {
   e.preventDefault();
 
   // --- iPhone/iOS オーディオ制限解除の強化 ---
+  // 1. AudioContextの生成または取得
   if (!_audioCtx) {
     _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
   
-  // iOS Safariでは resume() だけでなく、実際に音を出す操作をしないとロックが解けない場合がある
-  if (_audioCtx.state === 'suspended' || _audioCtx.state === 'interrupted') {
-    // 1x1の無音バッファを生成して再生
-    const buffer = _audioCtx.createBuffer(1, 1, 22050);
-    const source = _audioCtx.createBufferSource();
+  // 2. iOS Safari の強力なロックを「物理的な音出し」で解除
+  // resume() だけでは不十分なため、ごく短い無音を実際に再生します
+  const ac = _audioCtx;
+  if (ac) {
+    const buffer = ac.createBuffer(1, 1, 22050);
+    const source = ac.createBufferSource();
     source.buffer = buffer;
-    source.connect(_audioCtx.destination);
+    source.connect(ac.destination);
     source.start(0);
     
-    _audioCtx.resume().catch(() => {});
+    if (ac.state === 'suspended' || ac.state === 'interrupted') {
+      ac.resume().catch(() => {});
+    }
   }
 
-  // 発射音フラグをリセット（これをしないと2回目以降の発射時に音が鳴らなくなる）
-  _launchSoundPlayed = false;
-  // ------------------------------------------
+  // ★重要：発射音フラグをここで確実にリセット
+  // これにより playLaunchSound() が「まだ鳴らしていない」と認識できます
+  window._launchSoundPlayed = false; 
 
+  // --- ゲーム開始処理 ---
   if (state === 'stage_clear') {
     stageIdx++;
     if (stageIdx < STAGES.length) {
@@ -4989,6 +4988,7 @@ document.getElementById('startBtn').addEventListener('pointerdown', (e) => {
     handleStart();
   }
 
+  // UIの非表示処理
   document.getElementById('startBtn').classList.add('hidden');
   const hpw = document.getElementById('heartPlanetWrap');
   if(hpw) hpw.style.display = 'none';
@@ -4997,7 +4997,7 @@ document.getElementById('startBtn').addEventListener('pointerdown', (e) => {
 // handleStart関数を上書きして、キーボードや画面クリックで開始した際も隠れるようにする
 const originalHandleStart = handleStart;
 handleStart = function() {
-  // ここでも一応フラグをリセットしておくと安全
+  // ここでもリセットしておく
   _launchSoundPlayed = false;
   
   document.getElementById('startBtn').classList.add('hidden');
@@ -5412,6 +5412,57 @@ document.addEventListener('visibilitychange', () => {
     }
   }
 });
+
+
+// --- 強制上書き修正セクション ---
+(function() {
+  const sBtn = document.getElementById('startBtn');
+  if (!sBtn) return;
+
+  // 1. ボタン押下時の「絶対アンロック」処理
+  const forceUnlock = (e) => {
+    // ユーザー操作の直系ルートで AudioContext を作成/再開
+    if (!_audioCtx) {
+      _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    const ac = _audioCtx;
+    // 空の音を鳴らしてブラウザの「音出し許可」を確定させる
+    if (ac) {
+      const b = ac.createBuffer(1, 1, 22050);
+      const s = ac.createBufferSource();
+      s.buffer = b;
+      s.connect(ac.destination);
+      s.start(0);
+      if (ac.state === 'suspended') ac.resume();
+    }
+
+    // 発射音フラグをリセット
+    window._launchSoundPlayed = false;
+    console.log("Audio Unlocked via User Gesture");
+  };
+
+  // 既存のリスナーと競合しないよう、先頭で実行させる
+  sBtn.addEventListener('pointerdown', forceUnlock, true);
+  sBtn.addEventListener('click', forceUnlock, true);
+
+  // 2. 再生関数の再定義（既存のものを上書き）
+  window.playLaunchSound = function() {
+    if (window._launchSoundPlayed) return;
+    
+    stopLaunchSound();
+    const ac = _audioCtx;
+    if (!ac) return;
+
+    // resumeの状態を待たずに、とにかく再生を試みる
+    if (ac.state === 'suspended') ac.resume();
+    
+    if (typeof _playLaunchSoundNow === 'function') {
+      _playLaunchSoundNow(ac);
+      window._launchSoundPlayed = true;
+    }
+  };
+})();
 
 lastTime=performance.now();
 requestAnimationFrame(loop);

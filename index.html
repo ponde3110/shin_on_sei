@@ -738,6 +738,8 @@ function unlockAudio() {
   if (!_audioCtx) {
     _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
+  // 既に running なら何もしない（_audioCtxReady を上書きしない）
+  if (_audioCtx.state === 'running') return;
   if (_audioCtx.state === 'suspended') {
     // 無音バッファを再生してブラウザのオーディオロックを解除する（iOS 対策）
     const buf = _audioCtx.createBuffer(1, 1, 22050);
@@ -811,56 +813,65 @@ let _launchSoundNode  = null;
 let _launchSoundPlayed = false; // 1ステージで1回だけ再生するフラグ
 
 function playLaunchSound() {
+  console.log('[launch] called. played=', _launchSoundPlayed, 'ac=', _audioCtx ? _audioCtx.state : 'null');
   if (_launchSoundPlayed) return;
   stopLaunchSound();
-  const ac = getAC();
+
+  if (!_audioCtx) {
+    console.warn('[launch] _audioCtx is null — calling unlockAudio()');
+    unlockAudio();
+  }
+  const ac = _audioCtx;
+  console.log('[launch] ac.state=', ac ? ac.state : 'null');
   if (!ac) return;
+
   _launchSoundPlayed = true;
 
-  // iOS では resume() 完了前に ac.currentTime が 0 のまま進まない。
-  // Promise チェーンに頼らず、開始時刻に固定オフセットを乗せることで
-  // resume 完了までの遅延（~数百ms）をバッファとして吸収する。
-  if (ac.state === 'suspended') ac.resume().catch(() => {});
-  try {
-    const OFFSET = 0.5; // resume 完了を待つ余裕（秒）
-    const now = ac.currentTime + OFFSET;
+  const doPlay = () => {
+    try {
+      const now = ac.currentTime;
+      console.log('[launch] scheduled. now=', now);
 
-    // ノイズ成分（低域ローパス）
-    const gain = ac.createGain();
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.04, now + 0.4);
-    gain.gain.setValueAtTime(0.04, now + 3.5);
-    gain.gain.linearRampToValueAtTime(0, now + 5.0);
-    gain.connect(ac.destination);
+      const gain = ac.createGain();
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.04, now + 0.4);
+      gain.gain.setValueAtTime(0.04, now + 3.5);
+      gain.gain.linearRampToValueAtTime(0, now + 5.0);
+      gain.connect(ac.destination);
 
-    const bufLen = ac.sampleRate * 5.5;
-    const buf    = ac.createBuffer(1, bufLen, ac.sampleRate);
-    const data   = buf.getChannelData(0);
-    for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
-    const noise = ac.createBufferSource();
-    noise.buffer = buf;
-    const lp = ac.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(220, now);
-    lp.frequency.linearRampToValueAtTime(480, now + 5.0);
-    lp.Q.value = 1.5;
-    noise.connect(lp); lp.connect(gain);
-    noise.start(now);
+      const bufLen = ac.sampleRate * 5.5;
+      const buf    = ac.createBuffer(1, bufLen, ac.sampleRate);
+      const data   = buf.getChannelData(0);
+      for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+      const noise = ac.createBufferSource();
+      noise.buffer = buf;
+      const lp = ac.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(220, now);
+      lp.frequency.linearRampToValueAtTime(480, now + 5.0);
+      lp.Q.value = 1.5;
+      noise.connect(lp); lp.connect(gain);
+      noise.start();
 
-    // オシレータ成分（鋸波）
-    const osc = ac.createOscillator();
-    const og  = ac.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(55, now);
-    osc.frequency.linearRampToValueAtTime(90, now + 4.0);
-    og.gain.setValueAtTime(0, now);
-    og.gain.linearRampToValueAtTime(0.015, now + 0.6);
-    og.gain.linearRampToValueAtTime(0, now + 5.0);
-    osc.connect(og); og.connect(ac.destination);
-    osc.start(now); osc.stop(now + 5.5);
+      const osc = ac.createOscillator();
+      const og  = ac.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(55, now);
+      osc.frequency.linearRampToValueAtTime(90, now + 4.0);
+      og.gain.setValueAtTime(0, now);
+      og.gain.linearRampToValueAtTime(0.015, now + 0.6);
+      og.gain.linearRampToValueAtTime(0, now + 5.0);
+      osc.connect(og); og.connect(ac.destination);
+      osc.start(); osc.stop(now + 5.5);
 
-    _launchSoundNode = { noise, gain, osc, og };
-  } catch(e) {}
+      _launchSoundNode = { noise, gain, osc, og };
+    } catch(e) {
+      console.error('[launch] error:', e);
+    }
+  };
+
+  // resume() 完了を待ってから ac.currentTime を取得して音を組み立てる
+  _audioCtxReady.then(doPlay).catch(() => {});
 }
 
 function stopLaunchSound() {
@@ -4687,6 +4698,7 @@ function getClickedStage(mx, my){
 // ステージ開始（統一）
 // =========================
 function startFromMap(stage){
+  unlockAudio(); // 星クリック経由でも AudioContext を確実にアンロックする
   stageIdx = stage;
 
   // AudioContext のアンロックは非同期で行い、UIとゲーム開始は即座に実行する。
@@ -4825,13 +4837,9 @@ cv.addEventListener('touchend',e=>{
 // クリック（修正版）
 // =========================
 cv.addEventListener('click', (e) => {
-  // AudioContext のアンロック（待機しない）
-  if (!_audioCtx) {
-    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (_audioCtx.state === 'suspended') {
-    _audioCtx.resume().catch(() => {});
-  }
+  // iOS では touchstart で既に unlockAudio() 済み。
+  // PC クリックの場合もここでアンロックする。
+  unlockAudio();
 
   // プレイ中、またはアニメーション演出中は無視
   if (state === 'playing' || isAnim()) return;

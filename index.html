@@ -788,18 +788,26 @@ function getAC() {
 }
 
 // 出発：ロケット噴射音（低周波ノイズ＋轟音ロール）
+// ※ 必ず await unlockAudio() 完了後に呼ぶこと（iOSではそうしないと鳴らない）
 let _launchSoundNode = null;
 function playLaunchSound() {
   stopLaunchSound();
+  if (!_audioCtx || _audioCtx.state !== 'running') return;
   try {
-    const ac = getAC();
+    const ac = _audioCtx; // getAC()ではなく直接使用（runningが保証されている）
+    const now = ac.currentTime;
+    const dur = LAUNCH_DUR; // 5.0秒（出発アニメと同じ長さ）
+
+    // マスターゲイン：フェードイン→持続→フェードアウト
     const gain = ac.createGain();
-    gain.gain.setValueAtTime(0, ac.currentTime);
-    gain.gain.linearRampToValueAtTime(0.04, ac.currentTime + 0.4);
-    gain.gain.setValueAtTime(0.04, ac.currentTime + 3.5);
-    gain.gain.linearRampToValueAtTime(0, ac.currentTime + 5.0);
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.04, now + 0.4);
+    gain.gain.setValueAtTime(0.04, now + dur - 1.0);
+    gain.gain.linearRampToValueAtTime(0, now + dur);
     gain.connect(ac.destination);
-    const bufLen = ac.sampleRate * 5.5;
+
+    // ローパスノイズ（ゴゴゴという噴射音）
+    const bufLen = Math.ceil(ac.sampleRate * (dur + 0.1));
     const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
     const data = buf.getChannelData(0);
     for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
@@ -807,23 +815,25 @@ function playLaunchSound() {
     noise.buffer = buf;
     const lp = ac.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(220, ac.currentTime);
-    lp.frequency.linearRampToValueAtTime(480, ac.currentTime + 5.0);
+    lp.frequency.setValueAtTime(220, now);
+    lp.frequency.linearRampToValueAtTime(480, now + dur);
     lp.Q.value = 1.5;
     noise.connect(lp); lp.connect(gain);
-    noise.start();
+    noise.start(now);
     _launchSoundNode = { noise, gain };
+
+    // オシレータ（低音の轟き）
     const osc = ac.createOscillator();
     const og = ac.createGain();
     osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(55, ac.currentTime);
-    osc.frequency.linearRampToValueAtTime(90, ac.currentTime + 4.0);
-    og.gain.setValueAtTime(0, ac.currentTime);
-    og.gain.linearRampToValueAtTime(0.015, ac.currentTime + 0.6);
-    og.gain.linearRampToValueAtTime(0, ac.currentTime + 5.0);
+    osc.frequency.setValueAtTime(55, now);
+    osc.frequency.linearRampToValueAtTime(90, now + dur - 1.0);
+    og.gain.setValueAtTime(0, now);
+    og.gain.linearRampToValueAtTime(0.015, now + 0.6);
+    og.gain.linearRampToValueAtTime(0, now + dur);
     osc.connect(og); og.connect(ac.destination);
-    osc.start(); osc.stop(ac.currentTime + 5.5);
-  } catch(e) {}
+    osc.start(now); osc.stop(now + dur + 0.1);
+  } catch(e) { _launchSoundNode = null; }
 }
 function stopLaunchSound() {
   try {
@@ -4074,13 +4084,12 @@ function loop(ts){
   lastTime=ts;
 
   if(state==='launch_anim'){
-    if(launchT === 0 && dt > 0) playLaunchSound();
     launchT=Math.min(1,launchT+dt/LAUNCH_DUR);
     starScroll+=dt*30;
     for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life-=dt/p.maxLife;}
     particles=particles.filter(p=>p.life>0);
     drawStars(); updateAndDrawShootingStars(dt); drawLaunchAnim(); drawParticles();
-    if(launchT>=1) state='playing';
+    if(launchT>=1){ state='playing'; stopLaunchSound(); }
     requestAnimationFrame(loop); return;
   }
 
@@ -4591,10 +4600,11 @@ function isAnim() {
 // ==========================================
 // 3. handleStart 関数の補強
 // ==========================================
-function handleStart() {
+async function handleStart() {
   if(isAnim()) return;
-  // startStage に一本化（stageIdx はそのまま使う）
+  await unlockAudio();
   startStage(stageIdx);
+  playLaunchSound();
   updateBtn();
 }
 
@@ -4634,15 +4644,18 @@ function getClickedStage(mx, my){
 async function startFromMap(stage){
   stageIdx = stage;
 
-  // AudioContext の resume() が完了するまで待ってからアニメ開始
+  // AudioContext の resume() が完了するまで待つ（iOS対策）
   await unlockAudio();
 
   // UI非表示
   startBtn.classList.add('hidden');
   document.getElementById('heartPlanetWrap').style.display = 'none';
 
-  // 既存の開始処理へ
+  // ステージ開始（state='launch_anim', launchT=0 がセットされる）
   startStage(stage);
+
+  // unlockAudio完了後・ユーザージェスチャーのコールスタック内で音を鳴らす
+  playLaunchSound();
 }
 
 // =========================
@@ -4833,10 +4846,10 @@ document.getElementById('startBtn').addEventListener('pointerdown', async (e) =>
 
 // handleStart関数を上書きして、キーボードや画面クリックで開始した際も隠れるようにする
 const originalHandleStart = handleStart;
-handleStart = function() {
+handleStart = async function() {
   document.getElementById('startBtn').classList.add('hidden');
   document.getElementById('heartPlanetWrap').style.display = 'none';
-  originalHandleStart();
+  await originalHandleStart();
 };
 
 // --- ここまで追記 ---

@@ -731,6 +731,7 @@ let _bgmPlayPromise = null;    // play() の返値を追跡して iOS の AbortE
 
 // ── Web Audio API（SE 用） ──
 let _audioCtx = null;
+let _audioCtxReady = Promise.resolve(); // resume() 完了を追跡する Promise
 
 // ユーザー操作時に呼び出す。AudioContext の生成とアンロックを一元化する。
 function unlockAudio() {
@@ -744,7 +745,8 @@ function unlockAudio() {
     src.buffer = buf;
     src.connect(_audioCtx.destination);
     src.start(0);
-    _audioCtx.resume().catch(() => {});
+    // resume() の完了を Promise に保存し、SE 再生側から待てるようにする
+    _audioCtxReady = _audioCtx.resume().catch(() => {});
   }
 }
 
@@ -857,13 +859,10 @@ function playLaunchSound() {
     } catch(e) {}
   };
 
-  // suspended なら resume 完了後に音を組み立てる（完了前は ac.currentTime が 0 のまま）
-  // AC はボタン押下時に既にアンロック済みなので .then() のジェスチャースコープ問題は発生しない
-  if (ac.state === 'suspended') {
-    ac.resume().then(doPlay).catch(() => {});
-  } else {
-    doPlay();
-  }
+  // _audioCtxReady（unlockAudio の resume 完了 Promise）を待ってから再生する。
+  // iOS では bgm.play() と resume() が競合して resume が遅延することがあるため、
+  // 完了が確定してから ac.currentTime を取得しないと初回だけ音が鳴らない。
+  _audioCtxReady.then(doPlay).catch(() => {});
 }
 
 function stopLaunchSound() {

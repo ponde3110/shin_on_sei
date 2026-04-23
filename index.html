@@ -809,21 +809,24 @@ function getAC() {
 }
 
 // ── 発射音：ロケット噴射（launch.mp3） ──
-const _launchAudio = new Audio('launch.mp3');
-_launchAudio.volume = 1.0;
-_launchAudio.preload = 'auto';
+// Androidのオートプレイポリシー対策：Audio要素はユーザー操作時に生成・再生する
+let _launchAudio = null;
 
-// 発射音をジェスチャーハンドラから直接呼ぶ。
-// rAF(requestAnimationFrame)から play() を呼ぶと Autoplay Policy でブロックされるため、
-// タッチ・クリックイベントのコールスタック内でのみ呼び出す。
 function _triggerLaunchAudio() {
-  _launchAudio.currentTime = 0;
-  _launchAudio.play().catch(() => {});
+  try {
+    // 毎回新しいAudio要素を生成することでAndroidのオートプレイ制限を回避
+    _launchAudio = new Audio('launch.mp3');
+    _launchAudio.volume = 1.0;
+    const p = _launchAudio.play();
+    if (p) p.catch(() => {});
+  } catch(e) {}
 }
 
 function stopLaunchSound() {
-  _launchAudio.pause();
-  _launchAudio.currentTime = 0;
+  if (_launchAudio) {
+    _launchAudio.pause();
+    _launchAudio.currentTime = 0;
+  }
 }
 
 // 到着：空気を切り裂くホイッスル降下＋衝撃ドン
@@ -4653,8 +4656,7 @@ function startFromMap(stage){
   document.getElementById('heartPlanetWrap').style.display = 'none';
 
   startStage(stage);
-
-  // ジェスチャーハンドラ内で直接 play() する（rAF 経由だと Autoplay Policy でブロックされる）
+  // ジェスチャーハンドラ（pointerdown）のコールスタック内なのでplay()が許可される
   _triggerLaunchAudio();
 }
 
@@ -4820,6 +4822,7 @@ document.getElementById('startBtn').addEventListener('pointerdown', (e) => {
   e.stopPropagation();
   e.preventDefault();
   // --- ゲーム開始処理 ---
+  let willLaunch = true;
   if (state === 'stage_clear') {
     stageIdx++;
     if (stageIdx < STAGES.length) {
@@ -4827,6 +4830,7 @@ document.getElementById('startBtn').addEventListener('pointerdown', (e) => {
     } else {
       state = 'all_clear';
       updateBtn();
+      willLaunch = false;
     }
   } else if (state === 'over') {
     handleStart();

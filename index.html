@@ -787,6 +787,7 @@ function stopBgm() {
   // iOS: play() 完了前に pause() を呼ぶと AbortError になるため Promise 経由で停止
   const doPause = () => {
     bgm.pause();
+    bgm.loop = true; // 次の心音再生に備えてloopを戻しておく
     bgm.currentTime = 0;
     try { bgm.removeAttribute('src'); bgm.load(); } catch(e) {}
   };
@@ -808,25 +809,34 @@ function getAC() {
 }
 
 // ── 発射音：ロケット噴射（launch.mp3） ──
-// bgm（new Audio()）と同じ方式で生成する。
-// DOM の <audio> 要素はAndroidでユーザー操作権限が付与されないため使わない。
-const _launchAudio = new Audio('launch.mp3');
-_launchAudio.preload = 'auto';
-_launchAudio.volume  = 1.0;
-
+// bgm オブジェクトをそのまま流用して launch.mp3 を再生する。
+// bgm は Android でも確実に動作するため、同じオブジェクトを使えば
+// 発射音も確実に鳴る。心音BGM開始時（playBgm）に自動的に上書きされる。
 function _triggerLaunchAudio() {
   try {
-    _launchAudio.pause();
-    _launchAudio.currentTime = 0;
-    const p = _launchAudio.play();
-    if (p) p.catch(() => {});
+    bgm.pause();
+    bgm.loop        = false;
+    bgm.volume      = 1.0;
+    bgm.src         = 'launch.mp3';
+    bgm.currentTime = 0;
+    currentBgmFile  = null; // 心音管理フラグをリセット
+    _bgmPlayPromise = bgm.play();
+    if (_bgmPlayPromise) {
+      _bgmPlayPromise
+        .then(() => { _bgmPlayPromise = null; })
+        .catch(() => { _bgmPlayPromise = null; });
+    }
   } catch(e) {}
 }
 
 function stopLaunchSound() {
+  // launch.mp3 は playBgm() や stopBgm() で自動的に上書き・停止されるため
+  // 明示的に止める必要はないが、念のため loop をリセットしておく
   try {
-    _launchAudio.pause();
-    _launchAudio.currentTime = 0;
+    if (bgm.src && bgm.src.includes('launch.mp3') && !bgm.paused) {
+      bgm.pause();
+      bgm.currentTime = 0;
+    }
   } catch(e) {}
 }
 

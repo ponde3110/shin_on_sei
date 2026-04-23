@@ -737,17 +737,21 @@ let _audioCtx = null;
 // ユーザー操作時に呼び出す。AudioContext の生成とアンロックを一元化する。
 // ジェスチャーコールスタック内で同期的に呼ぶこと（await 禁止）。
 function unlockAudio() {
-  // AudioContext がまだなければ生成を試みる（生成自体はジェスチャー内なので許可される）
   if (!_audioCtx) {
     try {
       _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    } catch(e) { return; }
+    } catch(e) {}
   }
-  if (_audioCtx.state === 'running') return;
-  if (_audioCtx.state === 'suspended') {
-    // resume() は非同期。launch.mp3 は HTMLMediaElement で再生するため
-    // AudioContext の resume 完了を待つ必要はない。
+
+  if (_audioCtx && _audioCtx.state === 'suspended') {
     _audioCtx.resume().catch(() => {});
+  }
+
+  // 🔥 ここを変更：再生しない
+  if (_launchAudio) {
+    try {
+      _launchAudio.load(); // ← これだけでOK
+    } catch(e){}
   }
 }
 
@@ -787,7 +791,6 @@ function stopBgm() {
   // iOS: play() 完了前に pause() を呼ぶと AbortError になるため Promise 経由で停止
   const doPause = () => {
     bgm.pause();
-    bgm.loop = true; // 次の心音再生に備えてloopを戻しておく
     bgm.currentTime = 0;
     try { bgm.removeAttribute('src'); bgm.load(); } catch(e) {}
   };
@@ -809,34 +812,30 @@ function getAC() {
 }
 
 // ── 発射音：ロケット噴射（launch.mp3） ──
-// bgm オブジェクトをそのまま流用して launch.mp3 を再生する。
-// bgm は Android でも確実に動作するため、同じオブジェクトを使えば
-// 発射音も確実に鳴る。心音BGM開始時（playBgm）に自動的に上書きされる。
+// Android オートプレイ対策：
+//   - DOM に配置した <audio id="launchAudioEl"> を使う
+//   - ユーザー操作のコールスタック内で load() → play() を呼ぶ
+//   - AudioContext の resume() 完了を待たずに play() するため
+//     <audio> 要素方式（HTMLMediaElement）を使う（AudioContext 不要）
+const _launchAudio = document.getElementById('launchAudioEl');
+
 function _triggerLaunchAudio() {
+  if (!_launchAudio) return;
   try {
-    bgm.pause();
-    bgm.loop        = false;
-    bgm.volume      = 1.0;
-    bgm.src         = 'launch.mp3';
-    bgm.currentTime = 0;
-    currentBgmFile  = null; // 心音管理フラグをリセット
-    _bgmPlayPromise = bgm.play();
-    if (_bgmPlayPromise) {
-      _bgmPlayPromise
-        .then(() => { _bgmPlayPromise = null; })
-        .catch(() => { _bgmPlayPromise = null; });
-    }
+    _launchAudio.pause();
+    _launchAudio.currentTime = 0;
+    _launchAudio.volume = 1.0;
+
+    const p = _launchAudio.play();
+    if (p) p.catch(()=>{});
   } catch(e) {}
 }
 
 function stopLaunchSound() {
-  // launch.mp3 は playBgm() や stopBgm() で自動的に上書き・停止されるため
-  // 明示的に止める必要はないが、念のため loop をリセットしておく
+  if (!_launchAudio) return;
   try {
-    if (bgm.src && bgm.src.includes('launch.mp3') && !bgm.paused) {
-      bgm.pause();
-      bgm.currentTime = 0;
-    }
+    _launchAudio.pause();
+    _launchAudio.currentTime = 0;
   } catch(e) {}
 }
 
@@ -4827,6 +4826,10 @@ cv.addEventListener('click', (e) => {
 document.getElementById('startBtn').addEventListener('pointerdown', (e) => {
   e.stopPropagation();
   e.preventDefault();
+
+  // 🔥 これを追加（最重要）
+  unlockAudio();
+  
   // --- ゲーム開始処理 ---
   let willLaunch = true;
   if (state === 'stage_clear') {

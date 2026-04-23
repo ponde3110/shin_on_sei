@@ -787,7 +787,6 @@ function stopBgm() {
   // iOS: play() 完了前に pause() を呼ぶと AbortError になるため Promise 経由で停止
   const doPause = () => {
     bgm.pause();
-    bgm.loop = true; // 次の心音再生に備えてloopを戻しておく
     bgm.currentTime = 0;
     try { bgm.removeAttribute('src'); bgm.load(); } catch(e) {}
   };
@@ -809,34 +808,29 @@ function getAC() {
 }
 
 // ── 発射音：ロケット噴射（launch.mp3） ──
-// bgm オブジェクトをそのまま流用して launch.mp3 を再生する。
-// bgm は Android でも確実に動作するため、同じオブジェクトを使えば
-// 発射音も確実に鳴る。心音BGM開始時（playBgm）に自動的に上書きされる。
+// Android オートプレイ対策：
+//   - DOM に配置した <audio id="launchAudioEl"> を使う
+//   - ユーザー操作のコールスタック内で load() → play() を呼ぶ
+//   - AudioContext の resume() 完了を待たずに play() するため
+//     <audio> 要素方式（HTMLMediaElement）を使う（AudioContext 不要）
+const _launchAudio = document.getElementById('launchAudioEl');
+
 function _triggerLaunchAudio() {
+  if (!_launchAudio) return;
   try {
-    bgm.pause();
-    bgm.loop        = false;
-    bgm.volume      = 1.0;
-    bgm.src         = 'launch.mp3';
-    bgm.currentTime = 0;
-    currentBgmFile  = null; // 心音管理フラグをリセット
-    _bgmPlayPromise = bgm.play();
-    if (_bgmPlayPromise) {
-      _bgmPlayPromise
-        .then(() => { _bgmPlayPromise = null; })
-        .catch(() => { _bgmPlayPromise = null; });
-    }
+    _launchAudio.pause();
+    _launchAudio.currentTime = 0;
+    _launchAudio.volume = 1.0;
+    const p = _launchAudio.play();
+    if (p) p.catch(() => {});
   } catch(e) {}
 }
 
 function stopLaunchSound() {
-  // launch.mp3 は playBgm() や stopBgm() で自動的に上書き・停止されるため
-  // 明示的に止める必要はないが、念のため loop をリセットしておく
+  if (!_launchAudio) return;
   try {
-    if (bgm.src && bgm.src.includes('launch.mp3') && !bgm.paused) {
-      bgm.pause();
-      bgm.currentTime = 0;
-    }
+    _launchAudio.pause();
+    _launchAudio.currentTime = 0;
   } catch(e) {}
 }
 
@@ -4079,6 +4073,9 @@ function loop(ts){
 
 if(state==='launch_anim'){
 
+  // 最初のフレームで発射音を再生（playBgm と同じくrAFループ内から呼ぶ）
+  if(launchT === 0) _triggerLaunchAudio();
+
   // アニメーション進行
   launchT = Math.min(1, launchT + dt / LAUNCH_DUR);
   starScroll += dt * 30;
@@ -4662,8 +4659,7 @@ function startFromMap(stage){
   document.getElementById('heartPlanetWrap').style.display = 'none';
 
   startStage(stage);
-  // ジェスチャーハンドラ（pointerdown）のコールスタック内なのでplay()が許可される
-  _triggerLaunchAudio();
+  // 発射音はゲームループ（launch_anim の最初フレーム）で再生する
 }
 
 // =========================
@@ -4860,8 +4856,7 @@ handleStart = function() {
   const hpw = document.getElementById('heartPlanetWrap');
   if(hpw) hpw.style.display = 'none';
   originalHandleStart();
-  // ジェスチャーハンドラ内で直接 play()（rAF 経由は Autoplay Policy でブロックされる）
-  _triggerLaunchAudio();
+  // 発射音はゲームループ（launch_anim の最初フレーム）で再生する
 };
 
 // --- ここまで追記 ---

@@ -459,6 +459,8 @@ html, body {
   </div>
 </div>
 <button id="startBtn">START MISSION</button>
+<!-- launch.mp3 用 audio 要素：Android オートプレイ対策で DOM に配置 -->
+<audio id="launchAudioEl" src="launch.mp3" preload="auto" style="display:none"></audio>
 
 <!-- お祝いオーバーレイ -->
 <div id="celebrationOverlay">
@@ -735,19 +737,16 @@ let _audioCtx = null;
 // ユーザー操作時に呼び出す。AudioContext の生成とアンロックを一元化する。
 // ジェスチャーコールスタック内で同期的に呼ぶこと（await 禁止）。
 function unlockAudio() {
+  // AudioContext がまだなければ生成を試みる（生成自体はジェスチャー内なので許可される）
   if (!_audioCtx) {
-    try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { return; }
+    try {
+      _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch(e) { return; }
   }
   if (_audioCtx.state === 'running') return;
   if (_audioCtx.state === 'suspended') {
-    // 無音バッファを start() してから resume()（iOS で最も確実な方法）
-    try {
-      const buf = _audioCtx.createBuffer(1, 1, _audioCtx.sampleRate || 22050);
-      const src = _audioCtx.createBufferSource();
-      src.buffer = buf;
-      src.connect(_audioCtx.destination);
-      src.start(0);
-    } catch(e) {}
+    // resume() は非同期。launch.mp3 は HTMLMediaElement で再生するため
+    // AudioContext の resume 完了を待つ必要はない。
     _audioCtx.resume().catch(() => {});
   }
 }
@@ -809,24 +808,32 @@ function getAC() {
 }
 
 // ── 発射音：ロケット噴射（launch.mp3） ──
-// Androidのオートプレイポリシー対策：Audio要素はユーザー操作時に生成・再生する
-let _launchAudio = null;
+// Android オートプレイ対策：
+//   - DOM に配置した <audio id="launchAudioEl"> を使う
+//   - ユーザー操作のコールスタック内で load() → play() を呼ぶ
+//   - AudioContext の resume() 完了を待たずに play() するため
+//     <audio> 要素方式（HTMLMediaElement）を使う（AudioContext 不要）
+const _launchAudio = document.getElementById('launchAudioEl');
 
 function _triggerLaunchAudio() {
+  if (!_launchAudio) return;
   try {
-    // 毎回新しいAudio要素を生成することでAndroidのオートプレイ制限を回避
-    _launchAudio = new Audio('launch.mp3');
+    _launchAudio.pause();
+    _launchAudio.currentTime = 0;
     _launchAudio.volume = 1.0;
+    // Android Chrome: load() を呼んでからすぐ play() するとユーザージェスチャーが維持される
+    _launchAudio.load();
     const p = _launchAudio.play();
     if (p) p.catch(() => {});
   } catch(e) {}
 }
 
 function stopLaunchSound() {
-  if (_launchAudio) {
+  if (!_launchAudio) return;
+  try {
     _launchAudio.pause();
     _launchAudio.currentTime = 0;
-  }
+  } catch(e) {}
 }
 
 // 到着：空気を切り裂くホイッスル降下＋衝撃ドン
@@ -4641,15 +4648,10 @@ function getClickedStage(mx, my){
 // ステージ開始（統一）
 // =========================
 function startFromMap(stage){
-  unlockAudio();
   stageIdx = stage;
 
-  if (!_audioCtx) {
-    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (_audioCtx.state === 'suspended') {
-    _audioCtx.resume().catch(() => {});
-  }
+  // AudioContext のアンロック（非同期・launch.mp3 再生とは独立して行う）
+  unlockAudio();
 
   // UI非表示
   startBtn.classList.add('hidden');

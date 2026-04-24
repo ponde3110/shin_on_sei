@@ -677,6 +677,7 @@ const meteoriteImg = new Image(); meteoriteImg.src = 'meteorite.webp';
 const heartImg     = new Image(); heartImg.src = 'heart.webp';
 const ufoImg       = new Image(); ufoImg.src   = 'ufo.webp';
 const astronautImg = new Image(); astronautImg.src = 'astronaut.webp';
+const alienImg     = new Image(); alienImg.src     = 'alien.webp';
 const blackholeImg = new Image(); blackholeImg.src = 'blackhole.webp';
 const halleyImg    = new Image(); halleyImg.src    = 'halley.webp';
 
@@ -1421,10 +1422,10 @@ function drawSuckingObjects(){
         ctx.fillStyle = '#dde8f0'; ctx.fillRect(-13,-36,26,56);
       }
     } else if(s.type === 'astronaut'){
-      if(astronautImg.complete && astronautImg.naturalWidth > 0){
-        ctx.drawImage(astronautImg, -28, -28, 56, 56);
+      if(alienImg.complete && alienImg.naturalWidth > 0){
+        ctx.drawImage(alienImg, -28, -28, 56, 56);
       } else {
-        ctx.fillStyle = '#f0faff';
+        ctx.fillStyle = '#aaffaa';
         ctx.beginPath(); ctx.arc(0, -8, 10, 0, Math.PI*2); ctx.fill();
         ctx.fillRect(-8, -2, 16, 18);
       }
@@ -3334,17 +3335,17 @@ function drawAstronaut(a){
   const sc = (a.captureScale !== undefined && a.captureScale < 1) ? a.captureScale : 1;
   if(sc < 1) ctx.scale(sc, sc);
 
-  // SOSメッセージ（捕獲中は非表示）
+  // ！マーク（捕獲中は非表示）
   if(a.mode !== 'being_pulled'){
     const blink = Math.sin(Date.now() * 0.004) > 0;
     if(blink){
       ctx.save();
       ctx.shadowBlur = 10;
-      ctx.shadowColor = '#ff0';
-      ctx.fillStyle = '#fff9ba';
-      ctx.font = "bold 14px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
+      ctx.shadowColor = '#0f0';
+      ctx.fillStyle = '#aaffaa';
+      ctx.font = "bold 16px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
       ctx.textAlign = 'center';
-      ctx.fillText('SOS', 0, -45);
+      ctx.fillText('！', 0, -45);
       ctx.restore();
     }
   }
@@ -3352,11 +3353,11 @@ function drawAstronaut(a){
   ctx.rotate(a.rot);
 
   const drawSize = 65;
-  if(astronautImg.complete && astronautImg.naturalWidth > 0){
-    ctx.drawImage(astronautImg, -drawSize/2, -drawSize/2, drawSize, drawSize);
+  if(alienImg.complete && alienImg.naturalWidth > 0){
+    ctx.drawImage(alienImg, -drawSize/2, -drawSize/2, drawSize, drawSize);
   } else {
     const s = 2.4;
-    ctx.fillStyle = '#f0faff';
+    ctx.fillStyle = '#aaffaa';
     ctx.beginPath(); ctx.arc(0, -8*s, 6*s, 0, Math.PI * 2); ctx.fill();
     ctx.fillRect(-5*s, -3*s, 10*s, 12*s);
   }

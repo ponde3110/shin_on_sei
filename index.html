@@ -734,9 +734,8 @@ let currentBlock = null;
 //
 // 【設計方針】
 //   心音（BGM）: 単一の <audio> 要素を使い回し src を切り替えて再生。
-//                iOS/Android/PC で最も確実に動作する方式。
-//   効果音(SE) : Web Audio API (AudioContext) で生成。
-//   AudioContext は最初のユーザー操作時に一度だけ生成・アンロックする。
+//   効果音(SE) : <audio> 要素（MP3ファイル）で再生。Web Audio API は使用しない。
+//   launch.mp3 : 最優先で play() を呼び出し、Android の遅延を防ぐ。
 
 // ── 心音 BGM ──
 const bgm = new Audio();
@@ -745,12 +744,6 @@ bgm.volume = 0.55;
 
 let currentBgmFile  = null;   // 再生中ファイル名（null = 停止中）
 let _bgmPlayPromise = null;    // play() の返値を追跡して iOS の AbortError を防ぐ
-
-// ── Web Audio API（SE 用） ──
-let _audioCtx = null;
-
-// ユーザー操作時に呼び出す。AudioContext の生成とアンロックを一元化する。
-// ジェスチャーコールスタック内で同期的に呼ぶこと（await 禁止）。
 
 // ========== MP3 SE ヘルパー ==========
 function _playSE(id, volume) {
@@ -774,18 +767,14 @@ function _stopSE(id) {
 }
 
 function unlockAudio() {
-  // AudioContext がまだなければ生成を試みる（生成自体はジェスチャー内なので許可される）
-  if (!_audioCtx) {
-    try {
-      _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    } catch(e) { return; }
-  }
-  if (_audioCtx.state === 'running') return;
-  if (_audioCtx.state === 'suspended') {
-    // resume() は非同期。launch.mp3 は HTMLMediaElement で再生するため
-    // AudioContext の resume 完了を待つ必要はない。
-    _audioCtx.resume().catch(() => {});
-  }
+  // Web Audio API 不使用。audio要素の自動解放のみ。
+  try {
+    // 全SEを一瞬サイレント再生→即停止してブラウザにメディア許可を与える
+    document.querySelectorAll('audio[id^="se"], #launchAudioEl').forEach(el => {
+      el.volume = 0;
+      el.play().then(() => { el.pause(); el.currentTime = 0; el.volume = el.dataset.vol || 0.7; }).catch(() => {});
+    });
+  } catch(e) {}
 }
 
 // ステージ番号(1-7)に対応するmissionのブロックをランダム取得
@@ -836,20 +825,8 @@ function stopBgm() {
   currentBgmFile = null;
 }
 
-// AudioContext を取得する（suspended なら resume を試みる）
-function getAC() {
-  if (_audioCtx && _audioCtx.state === 'suspended') {
-    _audioCtx.resume().catch(() => {});
-  }
-  return _audioCtx;
-}
-
 // ── 発射音：ロケット噴射（launch.mp3） ──
-// Android オートプレイ対策：
-//   - DOM に配置した <audio id="launchAudioEl"> を使う
-//   - ユーザー操作のコールスタック内で load() → play() を呼ぶ
-//   - AudioContext の resume() 完了を待たずに play() するため
-//     <audio> 要素方式（HTMLMediaElement）を使う（AudioContext 不要）
+// Android オートプレイ対策：load() → play() でバッファを先頭に戻してから再生
 const _launchAudio = document.getElementById('launchAudioEl');
 
 function _triggerLaunchAudio() {
@@ -858,6 +835,8 @@ function _triggerLaunchAudio() {
     _launchAudio.pause();
     _launchAudio.currentTime = 0;
     _launchAudio.volume = 1.0;
+    // Android対策: load()で必ずバッファを先頭に戻してから play()
+    _launchAudio.load();
     const p = _launchAudio.play();
     if (p) p.catch(() => {});
   } catch(e) {}
@@ -894,7 +873,7 @@ function playMissSE() {
 // スラスター（MP3版）
 let _thrusterSoundTimer = 0;
 function playThrusterSE() {
-  if (!_audioCtx || _thrusterSoundTimer > 0) return;
+  if (_thrusterSoundTimer > 0) return;
   _thrusterSoundTimer = 0.12;
   _playSE('seThrusterEl', 0.5);
 }
@@ -3164,26 +3143,9 @@ function spawnAstronaut(){
   });
 }
 
-// SOS短音（モールス信号風の短いビープ）
+// SOS短音（MP3版）
 function playSosSE() {
-  try {
-    const ac = getAC();
-    const now = ac.currentTime;
-    // S・O・S（短・短・短 / 長・長・長 / 短・短・短）を小さく1回分だけ
-    const pattern = [0.07, 0.07, 0.07]; // 「S」の3短音だけ
-    pattern.forEach((dur, i) => {
-      const t = now + i * 0.14;
-      const osc = ac.createOscillator();
-      const g = ac.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = 880;
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.04, t + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-      osc.connect(g); g.connect(ac.destination);
-      osc.start(t); osc.stop(t + dur + 0.02);
-    });
-  } catch(e) {}
+  _playSE('seCorrectEl', 0.25); // 正解音を小音量で代用
 }
 
 function drawAstronaut(a){
@@ -3304,6 +3266,10 @@ function updateAstronauts(dt){
       a.rot += 0.06;
       if(a.captureScale <= 0.05) {
         a.alive = false;
+        // UFO回収によるエネルギー消費 -20
+        energy = Math.max(0, energy - 20);
+        life = Math.round(energy / ENERGY_MAX * LIFE_MAX);
+        hitFlash = 0.3;
         // UFOにビームを消させて立ち去らせる
         if(ufo){ ufo.beamActive = false; ufo.mode = 'depart'; }
       }
@@ -3938,14 +3904,9 @@ if(state==='launch_anim'){
       // isAnim()がtrueを返し続けないようにリセット
       arriveT = 0;
       launchT = 0;
-      // 全クリア時はここで直接お祝いを表示（AudioContextがアクティブなタイミングで呼ぶ）
+      // 全クリア時はここで直接お祝いを表示
       if(nextState === 'all_clear'){
-        // AudioContextを確実に起こしてからファンファーレ再生
-        if(_audioCtx && _audioCtx.state === 'suspended'){
-          _audioCtx.resume().then(()=>{ showCelebration(); }).catch(()=>{ showCelebration(); });
-        } else {
-          showCelebration();
-        }
+        showCelebration();
       }
     }
     requestAnimationFrame(loop); return;
@@ -4280,16 +4241,14 @@ function getClickedStage(mx, my){
 function startFromMap(stage){
   stageIdx = stage;
 
-  // AudioContext のアンロック（非同期・launch.mp3 再生とは独立して行う）
-  unlockAudio();
+  // ★ launch.mp3 を最優先で再生（Android: JSが重い処理より前に play() を呼ぶ）
+  _triggerLaunchAudio();
 
   // UI非表示
   startBtn.classList.add('hidden');
   document.getElementById('heartPlanetWrap').style.display = 'none';
 
   startStage(stage);
-  // ジェスチャーハンドラ（pointerdown）のコールスタック内なのでplay()が許可される
-  _triggerLaunchAudio();
 }
 
 // =========================
@@ -4316,7 +4275,7 @@ cv.addEventListener('mousemove', (e) => {
 // キーボード（変更なし）
 // =========================
 document.addEventListener('keydown',e=>{
-  keys[e.key]=true;
+  if(state !== 'launch_anim') keys[e.key]=true;
   if((e.key===' '||e.key==='Enter')&&!isAnim()&&state!=='playing'){
     e.preventDefault();
     if(state === 'stage_clear'){
@@ -4358,6 +4317,9 @@ cv.addEventListener('touchstart', (e) => {
   const mx = (t.clientX - rect.left) * (W / rect.width);
   const my = (t.clientY - rect.top) * (H / rect.height);
 
+  // 出発アニメ中は一切の入力を遮断（音声が途切れる問題の対策）
+  if(state === 'launch_anim') return;
+
   // playing中はタッチ位置で左右移動を即開始
   if(state === 'playing'){
     keys['ArrowLeft']  = mx < W / 2;
@@ -4390,6 +4352,7 @@ cv.addEventListener('touchstart', (e) => {
 cv.addEventListener('touchmove',e=>{
   e.preventDefault();
   if(!e.touches[0]) return;
+  if(state === 'launch_anim') return;
 
   const rect=cv.getBoundingClientRect();
   const rx=(e.touches[0].clientX-rect.left)/rect.width*W;
@@ -4403,6 +4366,7 @@ cv.addEventListener('touchmove',e=>{
 // =========================
 cv.addEventListener('touchend',e=>{
   e.preventDefault();
+  if(state === 'launch_anim') return;
   keys['ArrowLeft']=false;
   keys['ArrowRight']=false;
 },{passive:false});
@@ -4482,12 +4446,12 @@ document.getElementById('startBtn').addEventListener('pointerdown', (e) => {
 // handleStart を上書きして、ゲーム開始時にスタート画面 UI を非表示にする
 const originalHandleStart = handleStart;
 handleStart = function() {
+  // ★ launch.mp3 を最優先で再生（Android対策）
+  _triggerLaunchAudio();
   document.getElementById('startBtn').classList.add('hidden');
   const hpw = document.getElementById('heartPlanetWrap');
   if(hpw) hpw.style.display = 'none';
   originalHandleStart();
-  // ジェスチャーハンドラ内で直接 play()（rAF 経由は Autoplay Policy でブロックされる）
-  _triggerLaunchAudio();
 };
 
 // --- ここまで追記 ---
@@ -4810,9 +4774,7 @@ updateBtn = function() {
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     if (!bgm.paused) bgm.pause();
-    if (_audioCtx && _audioCtx.state === 'running') {
-      _audioCtx.suspend().catch(() => {});
-    }
+
   } else {
     const resume = () => {
       // stopBgm() 後（currentBgmFile === null）は再開しない
@@ -4825,17 +4787,12 @@ document.addEventListener('visibilitychange', () => {
         }
       }
     };
-    if (_audioCtx && _audioCtx.state === 'suspended') {
-      _audioCtx.resume().then(resume).catch(resume);
-    } else {
-      resume();
-    }
+    resume();
   }
 });
 
 
-// startBtn の pointerdown で AudioContext をアンロックする
-// （キャプチャフェーズで実行し、後続イベントより先に AudioContext を起こす）
+// startBtn の pointerdown でメディア解放（Android対策）
 document.getElementById('startBtn').addEventListener('pointerdown', () => {
   unlockAudio();
 }, true);

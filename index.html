@@ -766,14 +766,31 @@ function _stopSE(id) {
   } catch(e) {}
 }
 
+// ── 発射音 audio 要素（unlockAudio より先に宣言が必要）──
+const _launchAudio = document.getElementById('launchAudioEl');
+
+// ── 音声アンロック済みフラグ ──
+let _audioUnlocked = false;
+
 function unlockAudio() {
-  // Web Audio API 不使用。audio要素の自動解放のみ。
+  if (_audioUnlocked) return;
+  _audioUnlocked = true;
+  // launch音をサイレント再生して許可を取得しておく
   try {
-    // 全SEを一瞬サイレント再生→即停止してブラウザにメディア許可を与える
-    document.querySelectorAll('audio[id^="se"], #launchAudioEl').forEach(el => {
-      el.volume = 0;
-      el.play().then(() => { el.pause(); el.currentTime = 0; el.volume = el.dataset.vol || 0.7; }).catch(() => {});
-    });
+    const el = _launchAudio;
+    if (!el) return;
+    el.volume = 0;
+    el.currentTime = 0;
+    const p = el.play();
+    if (p) {
+      p.then(() => {
+        el.pause();
+        el.currentTime = 0;
+        el.volume = 1.0;
+      }).catch(() => {
+        try { el.volume = 1.0; } catch(e2) {}
+      });
+    }
   } catch(e) {}
 }
 
@@ -826,17 +843,14 @@ function stopBgm() {
 }
 
 // ── 発射音：ロケット噴射（launch.mp3） ──
-// Android オートプレイ対策：load() → play() でバッファを先頭に戻してから再生
-const _launchAudio = document.getElementById('launchAudioEl');
-
 function _triggerLaunchAudio() {
   if (!_launchAudio) return;
   try {
     _launchAudio.pause();
     _launchAudio.currentTime = 0;
     _launchAudio.volume = 1.0;
-    // Android対策: load()で必ずバッファを先頭に戻してから play()
-    _launchAudio.load();
+    // load() は使わない（Androidでバッファが空になる）
+    // unlock済みなので currentTime=0 → play() だけで確実に鳴る
     const p = _launchAudio.play();
     if (p) p.catch(() => {});
   } catch(e) {}
@@ -938,7 +952,7 @@ function stopAllSounds() {
 
 // UFO出現（MP3版）
 function playUfoAppearSE() {
-  _playSE('seUfoAppearEl', 0.7);
+  _playSE('seUfoAppearEl', 0.4);
 }
 
 // ブラックホール出現（MP3版）
@@ -4792,9 +4806,14 @@ document.addEventListener('visibilitychange', () => {
 });
 
 
-// startBtn の pointerdown でメディア解放（Android対策）
+// startBtn の pointerdown でメディア解放 + 発射音を即時再生（Android対策）
+// キャプチャフェーズ（true）で実行することで、後続ハンドラより先に play() を呼ぶ
 document.getElementById('startBtn').addEventListener('pointerdown', () => {
   unlockAudio();
+  // unlockAudio 内の play() より後に _triggerLaunchAudio() を呼ぶことで
+  // 「許可取得 → 即再生」を同一ジェスチャーコールスタック内で完結させる
+  // （Androidは同一タッチイベント内の複数 play() をすべて許可する）
+  _triggerLaunchAudio();
 }, true);
 
 lastTime=performance.now();

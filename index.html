@@ -1158,7 +1158,7 @@ let rocketShakeT=0; // for playing shake
 
 // 大破アニメーション
 let explosionT = 0;          // 大破アニメーションタイマー
-const EXPLOSION_DUR = 5.0;   // 大破演出の秒数
+const EXPLOSION_DUR = 3.5;   // 大破演出の最大秒数（パーティクル消滅で早期終了）
 let explosionParticles = [];  // 爆発パーティクル
 let explosionX = 0;           // 爆発位置X
 let explosionY = 0;           // 爆発位置Y
@@ -2142,7 +2142,47 @@ function drawBgDest(){
 
   const alpha = 1.0;  // 常に不透過
 
-  drawPlanet(W/2, dy, r, alpha, s.getTo(), s.toColor);
+  // 最終ミッション（心臓星）は拍動アニメを適用
+  const isFinalMission = (stageIdx === 6);
+  if (isFinalMission) {
+    // heartContract と同じ周期・タイミング（893ms周期）
+    const period = 893;
+    const now = performance.now();
+    // -164ms の delay を再現（位相オフセット）
+    const phase = ((now + 164) % period) / period; // 0.0〜1.0
+    // keyframe: 0%=1.0, 36.7%=0.82, 66%=1.0, 100%=1.0
+    let pulse;
+    if (phase < 0.367) {
+      // 収縮フェーズ: scale 1.0 → 0.82
+      const p = phase / 0.367;
+      // ease-in-out 近似
+      const e = p < 0.5 ? 2*p*p : 1 - Math.pow(-2*p+2,2)/2;
+      pulse = 1.0 - 0.18 * e;
+    } else if (phase < 0.66) {
+      // 拡張フェーズ: scale 0.82 → 1.0
+      const p = (phase - 0.367) / (0.66 - 0.367);
+      const e = p < 0.5 ? 2*p*p : 1 - Math.pow(-2*p+2,2)/2;
+      pulse = 0.82 + 0.18 * e;
+    } else {
+      // 静止フェーズ
+      pulse = 1.0;
+    }
+    // glow強度（収縮時に強くなる）
+    const glowT = phase < 0.367 ? Math.sin(phase / 0.367 * Math.PI) : 0;
+    const glowA = 0.55 + 0.35 * glowT;
+    const glowR = 8 + 12 * glowT;
+
+    ctx.save();
+    ctx.translate(W/2, dy);
+    ctx.scale(pulse, pulse);
+    // glow（drop-shadow の代わりにcanvasのshadow）
+    ctx.shadowColor = `rgba(255,215,60,${glowA})`;
+    ctx.shadowBlur = glowR * (r / 45);
+    drawPlanet(0, 0, r, alpha, s.getTo(), s.toColor);
+    ctx.restore();
+  } else {
+    drawPlanet(W/2, dy, r, alpha, s.getTo(), s.toColor);
+  }
 }
 
 // --- 発射炎エフェクト（描画） ---
@@ -3348,6 +3388,11 @@ function updateAstronauts(dt){
       a.vy *= Math.pow(0.85, dt * 60);
       if(Math.abs(a.vx) < 0.01) a.vx = 0;
       if(Math.abs(a.vy) < 0.01) a.vy = 0;
+      // 勢いで画面外に出た場合は速度を反転して押し返す
+      if(a.x < -20){ a.x = -20; a.vx = Math.abs(a.vx) * 0.5; }
+      if(a.x > W + 20){ a.x = W + 20; a.vx = -Math.abs(a.vx) * 0.5; }
+      if(a.y < -20){ a.y = -20; a.vy = Math.abs(a.vy) * 0.5; }
+      if(a.y > H + 20){ a.y = H + 20; a.vy = -Math.abs(a.vy) * 0.5; }
     }
 
     // blown: 彗星に吹き飛ばされた（回転しながら画面外へ）
@@ -3373,6 +3418,16 @@ function updateAstronauts(dt){
       a.x += Math.sin(a.timer * 0.5 + a.driftOffset) * 0.3;
       a.y += Math.cos(a.timer * 0.8 + a.driftOffset) * 0.2;
 
+      // 画面外に押し出された場合は画面内の安全な位置へ引き戻す
+      const outMargin = 60;
+      if(a.x < -outMargin || a.x > W + outMargin || a.y < -outMargin || a.y > H + outMargin){
+        a.targetX = W * 0.2 + Math.random() * (W * 0.6);
+        a.targetY = H * 0.3 + Math.random() * (H * 0.3);
+        a.mode = 'enter';
+        a.vx = 0;
+        a.vy = 0;
+      }
+
       // SOS音：約2.5秒ごとに1回鳴らす
       if(!a.sosTimer) a.sosTimer = 1.0 + Math.random(); // 初回は少しずらす
       a.sosTimer -= dt;
@@ -3381,8 +3436,9 @@ function updateAstronauts(dt){
         a.sosTimer = 2.5 + Math.random() * 0.5;
       }
 
-      // 捕獲タイマーが来たらUFO召喚
-      if(!a.beingCaptured && a.timer > a.captureTimer){
+      // 捕獲タイマーが来たらUFO召喚（宇宙飛行士が画面内にいるときだけ）
+      const onScreen = a.x >= 0 && a.x <= W && a.y >= 0 && a.y <= H;
+      if(!a.beingCaptured && a.timer > a.captureTimer && onScreen){
         a.beingCaptured = true;
         spawnCaptureUfo(a);
       }
@@ -4008,7 +4064,9 @@ if(state==='launch_anim'){
     }
 
     // 大破演出終了 → game over 画面へ
-    if(explosionT >= EXPLOSION_DUR){
+    // パーティクルが全部消えたら即遷移（最低0.8秒確保）、上限はEXPLOSION_DUR
+    const allParticlesDone = explosionT > 0.8 && explosionParticles.every(p => p.life <= 0);
+    if(allParticlesDone || explosionT >= EXPLOSION_DUR){
       state = 'over';
       _uiTime = 0;
       launchT = 0;

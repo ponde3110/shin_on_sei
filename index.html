@@ -461,6 +461,21 @@ html, body {
 <button id="startBtn">START MISSION</button>
 <!-- launch.mp3 用 audio 要素：Android オートプレイ対策で DOM に配置 -->
 <audio id="launchAudioEl" src="launch.mp3" preload="auto" style="display:none"></audio>
+<!-- SE用 audio 要素群（Web Audio API → MP3 置き換え版） -->
+<audio id="seArriveEl"    src="se/se_arrive.mp3"       preload="auto" style="display:none"></audio>
+<audio id="seCorrectEl"   src="se/se_correct.mp3"      preload="auto" style="display:none"></audio>
+<audio id="seWrongEl"     src="se/se_wrong.mp3"        preload="auto" style="display:none"></audio>
+<audio id="seMissEl"      src="se/se_miss.mp3"         preload="auto" style="display:none"></audio>
+<audio id="seThrusterEl"  src="se/se_thruster.mp3"     preload="auto" style="display:none"></audio>
+<audio id="seHalleyEl"    src="se/se_halley_appear.mp3" preload="auto" style="display:none"></audio>
+<audio id="seMeteorEl"    src="se/se_meteor_hit.mp3"   preload="auto" style="display:none"></audio>
+<audio id="seUfoAppearEl" src="se/se_ufo_appear.mp3"   preload="auto" style="display:none"></audio>
+<audio id="seUfoLoopEl"   src="se/se_ufo_loop.mp3"     preload="auto" loop style="display:none"></audio>
+<audio id="seBhAppearEl"  src="se/se_bh_appear.mp3"    preload="auto" style="display:none"></audio>
+<audio id="seBhLoopEl"    src="se/se_bh_loop.mp3"      preload="auto" loop style="display:none"></audio>
+<audio id="seExplosionEl" src="se/se_explosion.mp3"    preload="auto" style="display:none"></audio>
+<audio id="seRescueEl"    src="se/se_rescue.mp3"       preload="auto" style="display:none"></audio>
+<audio id="seFanfareEl"   src="se/se_fanfare.mp3"      preload="auto" style="display:none"></audio>
 
 <!-- お祝いオーバーレイ -->
 <div id="celebrationOverlay">
@@ -736,6 +751,28 @@ let _audioCtx = null;
 
 // ユーザー操作時に呼び出す。AudioContext の生成とアンロックを一元化する。
 // ジェスチャーコールスタック内で同期的に呼ぶこと（await 禁止）。
+
+// ========== MP3 SE ヘルパー ==========
+function _playSE(id, volume) {
+  try {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.pause();
+    el.currentTime = 0;
+    if (volume !== undefined) el.volume = volume;
+    const p = el.play();
+    if (p) p.catch(() => {});
+  } catch(e) {}
+}
+function _stopSE(id) {
+  try {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.pause();
+    el.currentTime = 0;
+  } catch(e) {}
+}
+
 function unlockAudio() {
   // AudioContext がまだなければ生成を試みる（生成自体はジェスチャー内なので許可される）
   if (!_audioCtx) {
@@ -834,311 +871,82 @@ function stopLaunchSound() {
   } catch(e) {}
 }
 
-// 到着：空気を切り裂くホイッスル降下＋衝撃ドン
+// 到着音（MP3版）
 function playArriveSound() {
-  try {
-    const ac = getAC();
-
-    // やさしい下降音
-    const osc = ac.createOscillator();
-    const og = ac.createGain();
-
-    osc.type = 'triangle'; // 柔らかい音
-    osc.frequency.setValueAtTime(1200, ac.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(300, ac.currentTime + 1.2);
-
-    og.gain.setValueAtTime(0.015, ac.currentTime);
-    og.gain.linearRampToValueAtTime(0, ac.currentTime + 1.4);
-
-    osc.connect(og);
-    og.connect(ac.destination);
-
-    osc.start();
-    osc.stop(ac.currentTime + 1.5);
-
-    // 軽い空気感だけ残すノイズ
-    const bufLen = ac.sampleRate * 1.2;
-    const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < bufLen; i++) d[i] = Math.random() * 2 - 1;
-
-    const ns = ac.createBufferSource();
-    ns.buffer = buf;
-
-    const hp = ac.createBiquadFilter();
-    hp.type = 'highpass';
-    hp.frequency.value = 1500;
-
-    const ng = ac.createGain();
-    ng.gain.setValueAtTime(0.006, ac.currentTime);
-    ng.gain.linearRampToValueAtTime(0, ac.currentTime + 1.2);
-
-    ns.connect(hp);
-    hp.connect(ng);
-    ng.connect(ac.destination);
-
-    ns.start();
-
-  } catch(e) {}
+  _playSE('seArriveEl', 0.7);
 }
 
-// 正解ハート取得：明るいチャイム
+// 正解チャイム（MP3版）
 function playCorrectSE() {
-  try {
-    const ac = getAC();
-    [523.25, 659.25, 783.99].forEach((f, i) => {
-      const osc = ac.createOscillator();
-      const g = ac.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = f;
-      g.gain.setValueAtTime(0, ac.currentTime + i * 0.09);
-      g.gain.linearRampToValueAtTime(0.05, ac.currentTime + i * 0.09 + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i * 0.09 + 0.35);
-      osc.connect(g); g.connect(ac.destination);
-      osc.start(ac.currentTime + i * 0.09);
-      osc.stop(ac.currentTime + i * 0.09 + 0.4);
-    });
-  } catch(e) {}
+  _playSE('seCorrectEl', 0.8);
 }
 
-// 不正解ハート取得：低い不協和音ブザー
+// 不正解ブザー（MP3版）
 function playWrongSE() {
-  try {
-    const ac = getAC();
-    [180, 170].forEach((f) => {
-      const osc = ac.createOscillator();
-      const g = ac.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.value = f;
-      g.gain.setValueAtTime(0.03, ac.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.45);
-      osc.connect(g); g.connect(ac.destination);
-      osc.start(); osc.stop(ac.currentTime + 0.5);
-    });
-  } catch(e) {}
+  _playSE('seWrongEl', 0.7);
 }
 
-// 正解ハートを逃した：スゥッと消える下降音
+// 逃した音（MP3版）
 function playMissSE() {
-  try {
-    const ac = getAC();
-    // メイン：高音から中音へ滑らかに落ちる笛のような音
-    const osc = ac.createOscillator();
-    const g = ac.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, ac.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(280, ac.currentTime + 0.55);
-    g.gain.setValueAtTime(0.07, ac.currentTime);
-    g.gain.setValueAtTime(0.07, ac.currentTime + 0.1);
-    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.65);
-    osc.connect(g); g.connect(ac.destination);
-    osc.start(); osc.stop(ac.currentTime + 0.7);
-    // サブ：わずかに遅れてより低い音が重なる（「スッ…」感）
-    const osc2 = ac.createOscillator();
-    const g2 = ac.createGain();
-    osc2.type = 'triangle';
-    osc2.frequency.setValueAtTime(440, ac.currentTime + 0.1);
-    osc2.frequency.exponentialRampToValueAtTime(160, ac.currentTime + 0.6);
-    g2.gain.setValueAtTime(0, ac.currentTime);
-    g2.gain.linearRampToValueAtTime(0.04, ac.currentTime + 0.15);
-    g2.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.65);
-    osc2.connect(g2); g2.connect(ac.destination);
-    osc2.start(ac.currentTime + 0.1); osc2.stop(ac.currentTime + 0.7);
-  } catch(e) {}
+  _playSE('seMissEl', 0.7);
 }
 
-// スラスター噴射音（左右移動時：短い低周波バースト）
+// スラスター（MP3版）
 let _thrusterSoundTimer = 0;
 function playThrusterSE() {
-  // 連打防止：0.12秒に1回まで
   if (!_audioCtx || _thrusterSoundTimer > 0) return;
   _thrusterSoundTimer = 0.12;
-  try {
-    const ac = getAC();
-    if (!ac) return;
-    const now = ac.currentTime;
-    const bufLen = ac.sampleRate * 0.10;
-    const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufLen, 1.5);
-    const noise = ac.createBufferSource();
-    noise.buffer = buf;
-    const lp = ac.createBiquadFilter();
-    lp.type = 'bandpass'; lp.frequency.value = 180; lp.Q.value = 1.2;
-    const g = ac.createGain();
-    g.gain.setValueAtTime(0.07, now);
-    g.gain.exponentialRampToValueAtTime(0.001, now + 0.10);
-    noise.connect(lp); lp.connect(g); g.connect(ac.destination);
-    noise.start(now);
-  } catch(e) {}
+  _playSE('seThrusterEl', 0.5);
 }
 
-// ハレー彗星出現音（不気味な下降する唸り）
+// ハレー彗星出現（MP3版）
 function playHalleyAppearSE() {
-  try {
-    const ac = getAC();
-    if (!ac) return;
-    const now = ac.currentTime;
-    // 下降するオシレータ（遠くから迫る感）
-    const osc = ac.createOscillator();
-    const g = ac.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(320, now);
-    osc.frequency.exponentialRampToValueAtTime(55, now + 1.8);
-    g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(0.04, now + 0.15);
-    g.gain.setValueAtTime(0.04, now + 1.2);
-    g.gain.exponentialRampToValueAtTime(0.001, now + 1.9);
-    const lp = ac.createBiquadFilter();
-    lp.type = 'lowpass'; lp.frequency.value = 900;
-    osc.connect(lp); lp.connect(g); g.connect(ac.destination);
-    osc.start(now); osc.stop(now + 2.0);
-    // 重低音の唸り
-    const osc2 = ac.createOscillator();
-    const g2 = ac.createGain();
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(48, now + 0.2);
-    osc2.frequency.linearRampToValueAtTime(28, now + 1.8);
-    g2.gain.setValueAtTime(0, now + 0.2);
-    g2.gain.linearRampToValueAtTime(0.06, now + 0.5);
-    g2.gain.exponentialRampToValueAtTime(0.001, now + 2.0);
-    osc2.connect(g2); g2.connect(ac.destination);
-    osc2.start(now + 0.2); osc2.stop(now + 2.1);
-  } catch(e) {}
+  _playSE('seHalleyEl', 0.7);
 }
 
-// 隕石衝突：ドスンと鈍い衝撃音
+// 隕石衝突（MP3版）
 function playMeteorHitSE() {
-  try {
-    const ac = getAC();
-    const osc = ac.createOscillator();
-    const og = ac.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(120, ac.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(40, ac.currentTime + 0.3);
-    og.gain.setValueAtTime(0.05, ac.currentTime);
-    og.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.35);
-    osc.connect(og); og.connect(ac.destination);
-    osc.start(); osc.stop(ac.currentTime + 0.4);
-    const bufLen = ac.sampleRate * 0.25;
-    const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < bufLen; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / bufLen);
-    const ns = ac.createBufferSource();
-    ns.buffer = buf;
-    const ng = ac.createGain();
-    ng.gain.value = 0.03;
-    ns.connect(ng); ng.connect(ac.destination);
-    ns.start();
-  } catch(e) {}
+  _playSE('seMeteorEl', 0.7);
 }
 
-// ===== UFO ループ音管理 =====
+// ===== UFO ループ音管理（MP3版）=====
 let _ufoLoopNodes = null;
 
 function startUfoLoopSound() {
-  if (_ufoLoopNodes) return; // 既に再生中
+  if (_ufoLoopNodes) return;
+  _ufoLoopNodes = true;
   try {
-    const ac = getAC();
-    const now = ac.currentTime;
-    const masterGain = ac.createGain();
-    masterGain.gain.setValueAtTime(0, now);
-    masterGain.gain.linearRampToValueAtTime(0.03, now + 0.4);
-    masterGain.connect(ac.destination);
-
-    const lfo = ac.createOscillator();
-    lfo.type = 'sine';
-    lfo.frequency.value = 5.5;
-    const lfoGain = ac.createGain();
-    lfoGain.gain.value = 18;
-
-    const osc1 = ac.createOscillator();
-    osc1.type = 'sine';
-    osc1.frequency.value = 420;
-    lfo.connect(lfoGain);
-    lfoGain.connect(osc1.frequency);
-    osc1.connect(masterGain);
-
-    const osc2 = ac.createOscillator();
-    osc2.type = 'triangle';
-    osc2.frequency.value = 840;
-    const g2 = ac.createGain();
-    g2.gain.value = 0.25;
-    osc2.connect(g2); g2.connect(masterGain);
-
-    lfo.start(); osc1.start(); osc2.start();
-    _ufoLoopNodes = { osc1, osc2, lfo, lfoGain, g2, masterGain };
+    const el = document.getElementById('seUfoLoopEl');
+    if (!el) return;
+    el.volume = 0.5;
+    const p = el.play();
+    if (p) p.catch(() => {});
   } catch(e) {}
 }
 
 function stopUfoLoopSound() {
-  if (!_ufoLoopNodes) return;
-  try {
-    const ac = getAC();
-    const g = _ufoLoopNodes.masterGain;
-    g.gain.setValueAtTime(g.gain.value, ac.currentTime);
-    g.gain.linearRampToValueAtTime(0.001, ac.currentTime + 0.3);
-    const nodes = _ufoLoopNodes;
-    setTimeout(() => {
-      try { nodes.lfo.stop(); nodes.osc1.stop(); nodes.osc2.stop(); } catch(e) {}
-    }, 400);
-  } catch(e) {}
   _ufoLoopNodes = null;
+  _stopSE('seUfoLoopEl');
 }
 
-// ===== ブラックホール ループ音管理 =====
+// ===== ブラックホール ループ音管理（MP3版）=====
 let _bhLoopNodes = null;
 
 function startBlackholeLoopSound() {
   if (_bhLoopNodes) return;
+  _bhLoopNodes = true;
   try {
-    const ac = getAC();
-    const now = ac.currentTime;
-    const masterGain = ac.createGain();
-    masterGain.gain.setValueAtTime(0, now);
-    masterGain.gain.linearRampToValueAtTime(0.13, now + 1.2);
-    masterGain.connect(ac.destination);
-
-    const lfo = ac.createOscillator();
-    lfo.type = 'sine';
-    lfo.frequency.value = 0.25;
-    const lfoGain = ac.createGain();
-    lfoGain.gain.value = 10;
-
-    const osc1 = ac.createOscillator();
-    osc1.type = 'sine';
-    osc1.frequency.value = 36;
-    lfo.connect(lfoGain);
-    lfoGain.connect(osc1.frequency);
-    osc1.connect(masterGain);
-
-    const osc2 = ac.createOscillator();
-    osc2.type = 'sawtooth';
-    osc2.frequency.value = 58;
-    const lp = ac.createBiquadFilter();
-    lp.type = 'lowpass'; lp.frequency.value = 200;
-    const g2 = ac.createGain();
-    g2.gain.value = 0.5;
-    osc2.connect(lp); lp.connect(g2); g2.connect(masterGain);
-
-    lfo.start(); osc1.start(); osc2.start();
-    _bhLoopNodes = { osc1, osc2, lfo, masterGain };
+    const el = document.getElementById('seBhLoopEl');
+    if (!el) return;
+    el.volume = 0.6;
+    const p = el.play();
+    if (p) p.catch(() => {});
   } catch(e) {}
 }
 
 function stopBlackholeLoopSound() {
-  if (!_bhLoopNodes) return;
-  try {
-    const ac = getAC();
-    const g = _bhLoopNodes.masterGain;
-    g.gain.setValueAtTime(g.gain.value, ac.currentTime);
-    g.gain.linearRampToValueAtTime(0.001, ac.currentTime + 0.8);
-    const nodes = _bhLoopNodes;
-    setTimeout(() => {
-      try { nodes.lfo.stop(); nodes.osc1.stop(); nodes.osc2.stop(); } catch(e) {}
-    }, 900);
-  } catch(e) {}
   _bhLoopNodes = null;
+  _stopSE('seBhLoopEl');
 }
 
 // 全音声を停止する（ステージ到着アニメ開始時などに呼ぶ）
@@ -1149,100 +957,19 @@ function stopAllSounds() {
   stopBlackholeLoopSound();
 }
 
-// UFO出現：宇宙的なビュイーン音
+// UFO出現（MP3版）
 function playUfoAppearSE() {
-  try {
-    const ac = getAC();
-    const now = ac.currentTime;
-    // ビュイーン上昇音
-    const osc = ac.createOscillator();
-    const g = ac.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(200, now);
-    osc.frequency.exponentialRampToValueAtTime(900, now + 0.5);
-    osc.frequency.exponentialRampToValueAtTime(600, now + 0.9);
-    g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(0.06, now + 0.08);
-    g.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
-    osc.connect(g); g.connect(ac.destination);
-    osc.start(now); osc.stop(now + 1.1);
-    // トレモロ成分（UFOらしいウォブル）
-    const osc2 = ac.createOscillator();
-    const g2 = ac.createGain();
-    osc2.type = 'triangle';
-    osc2.frequency.setValueAtTime(440, now + 0.1);
-    osc2.frequency.setValueAtTime(480, now + 0.3);
-    osc2.frequency.setValueAtTime(420, now + 0.6);
-    g2.gain.setValueAtTime(0, now + 0.1);
-    g2.gain.linearRampToValueAtTime(0.04, now + 0.2);
-    g2.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
-    osc2.connect(g2); g2.connect(ac.destination);
-    osc2.start(now + 0.1); osc2.stop(now + 1.1);
-  } catch(e) {}
+  _playSE('seUfoAppearEl', 0.7);
 }
 
-// ブラックホール出現：不気味な低音うなり
+// ブラックホール出現（MP3版）
 function playBlackholeAppearSE() {
-  try {
-    const ac = getAC();
-    const now = ac.currentTime;
-    // 重低音のうなり
-    const osc = ac.createOscillator();
-    const g = ac.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(60, now);
-    osc.frequency.linearRampToValueAtTime(35, now + 2.5);
-    g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(0.10, now + 0.6);
-    g.gain.setValueAtTime(0.10, now + 1.5);
-    g.gain.exponentialRampToValueAtTime(0.001, now + 3.0);
-    osc.connect(g); g.connect(ac.destination);
-    osc.start(now); osc.stop(now + 3.1);
-    // 歪み成分
-    const osc2 = ac.createOscillator();
-    const g2 = ac.createGain();
-    osc2.type = 'sawtooth';
-    osc2.frequency.setValueAtTime(80, now + 0.3);
-    osc2.frequency.linearRampToValueAtTime(45, now + 2.5);
-    g2.gain.setValueAtTime(0, now + 0.3);
-    g2.gain.linearRampToValueAtTime(0.04, now + 0.8);
-    g2.gain.exponentialRampToValueAtTime(0.001, now + 3.0);
-    osc2.connect(g2); g2.connect(ac.destination);
-    osc2.start(now + 0.3); osc2.stop(now + 3.1);
-    // ノイズ（宇宙の歪み感）
-    const bufLen = ac.sampleRate * 2.5;
-    const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
-    const d = buf.getChannelData(0);
-    for(let i = 0; i < bufLen; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i/bufLen, 0.5);
-    const ns = ac.createBufferSource();
-    ns.buffer = buf;
-    const lp = ac.createBiquadFilter();
-    lp.type = 'lowpass'; lp.frequency.value = 200;
-    const ng = ac.createGain();
-    ng.gain.setValueAtTime(0.03, now);
-    ng.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
-    ns.connect(lp); lp.connect(ng); ng.connect(ac.destination);
-    ns.start(now);
-  } catch(e) {}
+  _playSE('seBhAppearEl', 0.7);
 }
 
-// 宇宙飛行士救助：キラキラ上昇音
+// 救助音（MP3版）
 function playRescueSE() {
-  try {
-    const ac = getAC();
-    [440, 554, 659, 880].forEach((f, i) => {
-      const osc = ac.createOscillator();
-      const g = ac.createGain();
-      osc.type = 'triangle';
-      osc.frequency.value = f;
-      g.gain.setValueAtTime(0, ac.currentTime + i * 0.07);
-      g.gain.linearRampToValueAtTime(0.04, ac.currentTime + i * 0.07 + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i * 0.07 + 0.30);
-      osc.connect(g); g.connect(ac.destination);
-      osc.start(ac.currentTime + i * 0.07);
-      osc.stop(ac.currentTime + i * 0.07 + 0.35);
-    });
-  } catch(e) {}
+  _playSE('seRescueEl', 0.7);
 }
 
 // クリア済みミッション数（航路マップのクリック可能範囲を管理）
@@ -1324,104 +1051,9 @@ let explosionX = 0;           // 爆発位置X
 let explosionY = 0;           // 爆発位置Y
 let explosionPlayed = false;  // 効果音再生フラグ
 
-// 大破効果音（爆発・金属断裂・放電）
+// 大破爆発音（MP3版）
 function playExplosionSE() {
-  try {
-    const ac = getAC();
-    const now = ac.currentTime;
-
-    // 🌌 メイン爆発（低音）
-    const boom = ac.createOscillator();
-    const boomGain = ac.createGain();
-
-    boom.type = 'triangle';
-    boom.frequency.setValueAtTime(120, now);
-    boom.frequency.exponentialRampToValueAtTime(25, now + 0.8);
-
-    boomGain.gain.setValueAtTime(0.28, now); // ← 0.6 → 半分以下
-    boomGain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
-
-    boom.connect(boomGain);
-    boomGain.connect(ac.destination);
-    boom.start(now);
-    boom.stop(now + 1.0);
-
-    // 🌫 爆風ノイズ
-    const bufLen = ac.sampleRate * 1.2;
-    const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
-    const data = buf.getChannelData(0);
-
-    for(let i = 0; i < bufLen; i++){
-      const decay = Math.pow(1 - i / bufLen, 1.5);
-      data[i] = (Math.random() * 2 - 1) * decay;
-    }
-
-    const noise = ac.createBufferSource();
-    noise.buffer = buf;
-
-    const filter = ac.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(1200, now);
-
-    const ng = ac.createGain();
-    ng.gain.setValueAtTime(0.22, now); // ← 0.5 → 半分以下
-    ng.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
-
-    noise.connect(filter);
-    filter.connect(ng);
-    ng.connect(ac.destination);
-    noise.start(now);
-
-    // 🔩 金属破片（控えめ）
-    setTimeout(() => {
-      try {
-        const ac2 = getAC();
-        const now2 = ac2.currentTime;
-
-        for(let i=0;i<3;i++){ // ← 4 → 3に減らす
-          const osc = ac2.createOscillator();
-          const g = ac2.createGain();
-
-          osc.type = 'square';
-          osc.frequency.value = 1500 + Math.random()*2500;
-
-          g.gain.setValueAtTime(0.04, now2); // ← 半減
-          g.gain.exponentialRampToValueAtTime(0.001, now2 + 0.15);
-
-          osc.connect(g);
-          g.connect(ac2.destination);
-
-          osc.start(now2);
-          osc.stop(now2 + 0.15);
-        }
-      } catch(e){}
-    }, 60);
-
-    // 🌌 余韻低音（かなり控えめ）
-    setTimeout(() => {
-      try {
-        const ac3 = getAC();
-        const now3 = ac3.currentTime;
-
-        const sub = ac3.createOscillator();
-        const sg = ac3.createGain();
-
-        sub.type = 'sine';
-        sub.frequency.setValueAtTime(50, now3);
-        sub.frequency.exponentialRampToValueAtTime(28, now3 + 0.8);
-
-        sg.gain.setValueAtTime(0.07, now3); // ← 0.15 → 半分以下
-        sg.gain.exponentialRampToValueAtTime(0.001, now3 + 0.9);
-
-        sub.connect(sg);
-        sg.connect(ac3.destination);
-
-        sub.start(now3);
-        sub.stop(now3 + 1.0);
-      } catch(e){}
-    }, 120);
-
-  } catch(e){}
+  _playSE('seExplosionEl', 0.7);
 }
 
 // 爆発パーティクルを生成
@@ -4939,69 +4571,9 @@ function buildJourneyTrail() {
   });
 }
 
-// 豪華ファンファーレ（Web Audio API）
+// ファンファーレ（MP3版）
 function playFanfare() {
-  try {
-    const ac = getAC();
-    const doPlay = () => {
-      try {
-        // メロディー：壮大な到達感
-        const melody = [
-          {f:261.63,t:0.0, d:0.12,v:0.15},
-          {f:329.63,t:0.12,d:0.12,v:0.15},
-          {f:392.00,t:0.24,d:0.12,v:0.15},
-          {f:523.25,t:0.36,d:0.25,v:0.20},
-          {f:659.25,t:0.62,d:0.20,v:0.22},
-          {f:783.99,t:0.82,d:0.20,v:0.22},
-          {f:1046.5,t:1.02,d:0.55,v:0.28},
-          {f:783.99,t:1.02,d:0.55,v:0.18},
-          {f:1174.7,t:1.58,d:0.18,v:0.22},
-          {f:1318.5,t:1.76,d:0.90,v:0.30},
-          {f:1046.5,t:1.76,d:0.90,v:0.20},
-        ];
-        melody.forEach(({f,t,d,v})=>{
-          const osc = ac.createOscillator();
-          const gain = ac.createGain();
-          osc.connect(gain); gain.connect(ac.destination);
-          osc.type = 'triangle';
-          osc.frequency.value = f;
-          gain.gain.setValueAtTime(0, ac.currentTime+t);
-          gain.gain.linearRampToValueAtTime(v, ac.currentTime+t+0.03);
-          gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+t+d);
-          osc.start(ac.currentTime+t);
-          osc.stop(ac.currentTime+t+d+0.05);
-        });
-
-        // ベース和音
-        [[130.81,261.63],[164.81,329.63],[196.00,392.00]].forEach(([f1,f2],i)=>{
-          [f1,f2].forEach(f=>{
-            const osc=ac.createOscillator(), gain=ac.createGain();
-            osc.connect(gain); gain.connect(ac.destination);
-            osc.type='sine'; osc.frequency.value=f;
-            gain.gain.setValueAtTime(0.06,ac.currentTime+1.02);
-            gain.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+2.8);
-            osc.start(ac.currentTime+1.02);
-            osc.stop(ac.currentTime+2.85);
-          });
-        });
-
-        // 到着フラッシュ時の衝撃音（2.8秒後）
-        const boom = ac.createOscillator();
-        const boomGain = ac.createGain();
-        boom.connect(boomGain); boomGain.connect(ac.destination);
-        boom.type = 'sine'; boom.frequency.value = 80;
-        boomGain.gain.setValueAtTime(0.35, ac.currentTime+2.8);
-        boomGain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+3.3);
-        boom.start(ac.currentTime+2.8); boom.stop(ac.currentTime+3.35);
-      } catch(e){}
-    };
-    // AudioContext が suspended なら resume してから再生
-    if (ac.state === 'suspended') {
-      ac.resume().then(doPlay).catch(doPlay);
-    } else {
-      doPlay();
-    }
-  } catch(e){}
+  _playSE('seFanfareEl', 0.9);
 }
 
 // 豪華紙吹雪

@@ -555,7 +555,7 @@ html, body {
 <button id="startBtn">START MISSION</button>
 <button id="beatStartBtn">拍動開始</button>
 <!-- launch.mp3 用 audio 要素：Android オートプレイ対策で DOM に配置 -->
-<audio id="launchAudioEl" src="launch.mp3" preload="auto" style="display:none"></audio>
+<audio id="launchAudioEl" src="se/launch.mp3" preload="auto" style="display:none"></audio>
 <!-- SE用 audio 要素群（Web Audio API → MP3 置き換え版） -->
 <audio id="seArriveEl"    src="se/se_arrive.mp3"       preload="auto" style="display:none"></audio>
 <audio id="seCorrectEl"   src="se/se_correct.mp3"      preload="auto" style="display:none"></audio>
@@ -877,18 +877,33 @@ const _launchAudio = document.getElementById('launchAudioEl');
 // ── 音声アンロック済みフラグ ──
 let _audioUnlocked = false;
 
+// ── Web Audio API コンテキスト（アンロック専用）──
+// iOS/iPadOS では <audio> 要素の play() をジェスチャー外から呼ぶと再生がブロックされる。
+// Web Audio API の「無音1サンプルバッファを再生する」がiOSで確立された
+// 唯一の確実なアンロック方法。これにより <audio> 要素も含めて制限が解除される。
+// ★ SE要素の play() をアンロック時に一切呼ばないので「誤再生」が発生しない。
+let _audioCtx = null;
+
 function unlockAudio() {
   if (_audioUnlocked) return;
   _audioUnlocked = true;
 
-  // ── iOS / iPad / Android / PC 共通方針 ──
-  // iOSでは「ユーザージェスチャー内で play() を呼んだ audio 要素のみ」が
-  // 以降どのタイミングでも再生可能になる。
-  // 対策：アンロック時に全 <audio> 要素を volume=0 で play→pause して
-  // iOS に「この要素は再生許可済み」と登録させる。
-  // これにより、後からゲームロジックが _playSE() を呼んだときにも確実に鳴る。
+  // ── Step 1: Web Audio API 空バッファでiOSのメディア制限を解除 ──
+  try {
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const buf = _audioCtx.createBuffer(1, 1, 22050); // 1サンプル・完全無音
+    const src = _audioCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(_audioCtx.destination);
+    src.start(0);
+    if (_audioCtx.state === 'suspended') {
+      _audioCtx.resume();
+    }
+  } catch(e) {}
 
-  // BGM用 Audio オブジェクト をアンロック
+  // ── Step 2: BGM用 Audio オブジェクトのみ無音で play→pause してアンロック ──
+  // SE <audio> 要素は play() を呼ばない（呼ぶと音が鳴ってしまうため）。
+  // Web Audio API のアンロックで <audio> 要素も同時に解放される。
   try {
     const prevVol = bgm.volume;
     if (!bgm.src || bgm.src === location.href) {
@@ -915,38 +930,6 @@ function unlockAudio() {
       }
     }
   } catch(e) {}
-
-  // 全SE <audio> 要素を無音で play→pause してiOS/iPadにアンロック登録
-  const seIds = [
-    'launchAudioEl',
-    'seArriveEl','seCorrectEl','seWrongEl','seMissEl',
-    'seThrusterEl','seHalleyEl','seMeteorEl',
-    'seUfoAppearEl','seUfoLoopEl',
-    'seBhAppearEl','seBhLoopEl',
-    'seExplosionEl','seRescueEl','seFanfareEl'
-  ];
-  seIds.forEach(id => {
-    try {
-      const el = document.getElementById(id);
-      if (!el) return;
-      const prevVol = el.volume;
-      el.volume = 0;
-      const p = el.play();
-      if (p) {
-        p.then(() => {
-          el.pause();
-          el.currentTime = 0;
-          el.volume = prevVol;
-        }).catch(() => {
-          try { el.volume = prevVol; } catch(e2) {}
-        });
-      } else {
-        el.pause();
-        el.currentTime = 0;
-        el.volume = prevVol;
-      }
-    } catch(e) {}
-  });
 }
 
 // ステージ番号(1-7)に対応するmissionのブロックをランダム取得

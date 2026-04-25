@@ -874,23 +874,38 @@ let _audioUnlocked = false;
 function unlockAudio() {
   if (_audioUnlocked) return;
   _audioUnlocked = true;
-  // launch音をサイレント再生して許可を取得しておく
+
+  // ── iOSは audio要素ごとに個別のユーザージェスチャー内 play() が必要。
+  // launch音のみではBGMはアンロックできるがSE各要素は再生不可になる。
+  // 全SE要素をサイレント再生してまとめてアンロックする。
+  const seIds = [
+    'launchAudioEl','seArriveEl','seCorrectEl','seWrongEl','seMissEl',
+    'seThrusterEl','seHalleyEl','seMeteorEl','seUfoAppearEl','seUfoLoopEl',
+    'seBhAppearEl','seBhLoopEl','seExplosionEl','seRescueEl','seFanfareEl'
+  ];
+  for (const id of seIds) {
+    try {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      const prevVol = el.volume;
+      el.volume = 0;
+      el.currentTime = 0;
+      const p = el.play();
+      if (p) p.then(() => { el.pause(); el.currentTime = 0; el.volume = prevVol; })
+               .catch(() => { try { el.volume = prevVol; } catch(e2){} });
+    } catch(e) {}
+  }
+
+  // launch音は通常音量で再度トリガー（上記でサイレント再生済みなので確実に鳴る）
   try {
     const el = _launchAudio;
-    if (!el) return;
-    el.volume = 0;
-    el.currentTime = 0;
-    const p = el.play();
-    if (p) {
-      p.then(() => {
-        el.pause();
-        el.currentTime = 0;
-        el.volume = 1.0;
-        // アンロック完了後、スタート画面かつBGM未再生なら apex.mp3 を再生開始
+    if (el) {
+      // アンロック完了後、スタート画面かつBGM未再生なら apex.mp3 を再生開始
+      const p2 = el.play();
+      if (p2) p2.then(() => {
+        el.pause(); el.currentTime = 0; el.volume = 1.0;
         if (state === 'start' && currentBgmFile !== 'apex.mp3') startScreenBgmPlay();
-      }).catch(() => {
-        try { el.volume = 1.0; } catch(e2) {}
-      });
+      }).catch(() => { try { el.volume = 1.0; } catch(e2){} });
     }
   } catch(e) {}
 }
@@ -1141,30 +1156,84 @@ function buildStarCaches(bgHue) {
     const c = oc.getContext('2d');
     c.clearRect(0, 0, W, H * 2);
 
-    // ── ネビュラ（遠景レイヤーのみ）
+    // ── ネビュラ（遠景レイヤーのみ・キャッシュ内なのでコストゼロ）
     if (layer.nebula) {
+      // ステージの色相を基準に補色・類似色を組み合わせる
+      const h1 = bgHue;
+      const h2 = (bgHue + 40)  % 360; // 類似色
+      const h3 = (bgHue + 200) % 360; // 補色系
+
+      // ネビュラ定義：位置・サイズ・傾き・主色・副色
       const nebulas = [
-        { x: W*0.25, y: H*0.30, rx: 70, ry: 55 },
-        { x: W*0.72, y: H*0.70, rx: 55, ry: 45 },
-        { x: W*0.50, y: H*1.40, rx: 80, ry: 60 }, // タイル下半分
-        { x: W*0.20, y: H*1.80, rx: 50, ry: 40 },
+        { x:W*0.30, y:H*0.22, rx:95, ry:58, rot:-0.35, hA:h1, hB:h2 },
+        { x:W*0.75, y:H*0.65, rx:78, ry:50, rot: 0.50, hA:h3, hB:h1 },
+        { x:W*0.18, y:H*0.88, rx:65, ry:42, rot:-0.20, hA:h2, hB:h3 },
+        { x:W*0.55, y:H*1.35, rx:90, ry:55, rot: 0.30, hA:h1, hB:h3 },
+        { x:W*0.80, y:H*1.72, rx:70, ry:44, rot:-0.45, hA:h3, hB:h2 },
+        { x:W*0.25, y:H*1.88, rx:60, ry:38, rot: 0.15, hA:h2, hB:h1 },
       ];
+
+      c.save();
+      c.globalCompositeOperation = 'screen'; // 重ねるほど明るく・宇宙らしい発光感
+
       for (const nb of nebulas) {
-        // 色相をbgHueに基づいて変化させる
-        const h1 = (bgHue + 20)  % 360;
-        const h2 = (bgHue + 200) % 360;
-        const g = c.createRadialGradient(nb.x, nb.y, 0, nb.x, nb.y, Math.max(nb.rx, nb.ry));
-        g.addColorStop(0,   `hsla(${h1},60%,35%,0.18)`);
-        g.addColorStop(0.5, `hsla(${h2},50%,25%,0.10)`);
-        g.addColorStop(1,   'rgba(0,0,0,0)');
         c.save();
-        c.scale(1, nb.ry / nb.rx); // 楕円形に
-        c.fillStyle = g;
-        c.beginPath();
-        c.arc(nb.x, nb.y * (nb.rx / nb.ry), nb.rx, 0, Math.PI * 2);
-        c.fill();
+        // 傾き
+        c.translate(nb.x, nb.y);
+        c.rotate(nb.rot);
+        c.translate(-nb.x, -nb.y);
+
+        // ── 外層：大きく薄いハロー
+        const g0 = c.createRadialGradient(nb.x, nb.y, 0, nb.x, nb.y, nb.rx * 1.6);
+        g0.addColorStop(0,   `hsla(${nb.hA},70%,40%,0.07)`);
+        g0.addColorStop(0.6, `hsla(${nb.hB},60%,30%,0.04)`);
+        g0.addColorStop(1,   'rgba(0,0,0,0)');
+        c.save();
+        c.scale(1, nb.ry / nb.rx);
+        c.fillStyle = g0;
+        c.beginPath(); c.arc(nb.x, nb.y * nb.rx/nb.ry, nb.rx*1.6, 0, Math.PI*2); c.fill();
+        c.restore();
+
+        // ── 中層：本体のガス雲（やや濃い）
+        const g1 = c.createRadialGradient(nb.x, nb.y, 0, nb.x, nb.y, nb.rx);
+        g1.addColorStop(0,   `hsla(${nb.hA},80%,55%,0.22)`);
+        g1.addColorStop(0.4, `hsla(${nb.hA},70%,40%,0.14)`);
+        g1.addColorStop(0.75,`hsla(${nb.hB},60%,30%,0.07)`);
+        g1.addColorStop(1,   'rgba(0,0,0,0)');
+        c.save();
+        c.scale(1, nb.ry / nb.rx);
+        c.fillStyle = g1;
+        c.beginPath(); c.arc(nb.x, nb.y * nb.rx/nb.ry, nb.rx, 0, Math.PI*2); c.fill();
+        c.restore();
+
+        // ── 内層：明るいコア（星形成領域）
+        const g2 = c.createRadialGradient(nb.x, nb.y, 0, nb.x, nb.y, nb.rx * 0.35);
+        g2.addColorStop(0,   `hsla(${nb.hA},90%,80%,0.28)`);
+        g2.addColorStop(0.5, `hsla(${nb.hA},80%,60%,0.14)`);
+        g2.addColorStop(1,   'rgba(0,0,0,0)');
+        c.fillStyle = g2;
+        c.beginPath(); c.arc(nb.x, nb.y, nb.rx*0.35, 0, Math.PI*2); c.fill();
+
+        // ── ダスト：不規則な小塊を数個散らす（ガスの凹凸感）
+        const clumps = 4 + Math.floor(Math.random()*3);
+        for (let ci = 0; ci < clumps; ci++) {
+          const angle = (ci / clumps) * Math.PI * 2 + Math.random();
+          const dist  = nb.rx * (0.15 + Math.random() * 0.55);
+          const cx2   = nb.x + Math.cos(angle) * dist;
+          const cy2   = nb.y + Math.sin(angle) * dist * (nb.ry/nb.rx);
+          const cr    = nb.rx * (0.08 + Math.random() * 0.18);
+          const hC    = Math.random() < 0.5 ? nb.hA : nb.hB;
+          const gc = c.createRadialGradient(cx2, cy2, 0, cx2, cy2, cr);
+          gc.addColorStop(0,  `hsla(${hC},75%,65%,0.18)`);
+          gc.addColorStop(1,  'rgba(0,0,0,0)');
+          c.fillStyle = gc;
+          c.beginPath(); c.arc(cx2, cy2, cr, 0, Math.PI*2); c.fill();
+        }
+
         c.restore();
       }
+
+      c.restore(); // globalCompositeOperation をリセット
     }
 
     // ── 星を H*2 の範囲にランダム配置
@@ -5005,7 +5074,8 @@ document.getElementById('startBtn').addEventListener('pointerdown', () => {
     beatBtn.style.display = 'none';
 
     // 2. オーディオアンロック＆apex.mp3 再生＋拍動開始（心臓星はすでに表示済み）
-    _audioUnlocked = true;
+    // unlockAudio() で全SE要素をまとめてアンロック（iPad対策）
+    unlockAudio();
     startScreenBgmPlay();
 
     // 3. 2心拍（893ms × 2 ≒ 1800ms）後にCanvas・startBtn・聴診器を一斉表示

@@ -875,39 +875,77 @@ function unlockAudio() {
   if (_audioUnlocked) return;
   _audioUnlocked = true;
 
-  // ── iOSは audio要素ごとに個別のユーザージェスチャー内 play() が必要。
-  // launch音のみではBGMはアンロックできるがSE各要素は再生不可になる。
-  // 全SE要素をサイレント再生してまとめてアンロックする。
+  // ── iOS対策：全SE要素を1つずつ順番にアンロックする。
+  // 同時に複数の play() を呼ぶと、iOSではユーザージェスチャーの
+  // スコープが終了したとみなされ、後続の音声が一斉に再生される問題が起きる。
+  // シーケンシャルに (Promise chain) 処理することでこれを防ぐ。
   const seIds = [
     'launchAudioEl','seArriveEl','seCorrectEl','seWrongEl','seMissEl',
     'seThrusterEl','seHalleyEl','seMeteorEl','seUfoAppearEl','seUfoLoopEl',
     'seBhAppearEl','seBhLoopEl','seExplosionEl','seRescueEl','seFanfareEl'
   ];
-  for (const id of seIds) {
+
+  // iOS判定
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  if (isIOS) {
+    // iOS: 小さな遅延を挟みながら1つずつアンロック（一斉再生を防ぐ）
+    let chain = Promise.resolve();
+    seIds.forEach((id, idx) => {
+      chain = chain.then(() => new Promise(resolve => {
+        // 最初の要素(launch)は即時、以降は微小遅延
+        setTimeout(() => {
+          try {
+            const el = document.getElementById(id);
+            if (!el) { resolve(); return; }
+            const prevVol = el.volume;
+            el.volume = 0;
+            el.currentTime = 0;
+            const p = el.play();
+            if (p) {
+              p.then(() => {
+                el.pause(); el.currentTime = 0; el.volume = prevVol;
+                resolve();
+              }).catch(() => {
+                try { el.volume = prevVol; } catch(e2){}
+                resolve();
+              });
+            } else { resolve(); }
+          } catch(e) { resolve(); }
+        }, idx * 20); // 20ms間隔で順番に処理
+      }));
+    });
+    // 全アンロック後、スタート画面のBGM確認
+    chain.then(() => {
+      if (state === 'start' && currentBgmFile !== 'apex.mp3') startScreenBgmPlay();
+    });
+  } else {
+    // Android/PC: 従来通り一括アンロック
+    for (const id of seIds) {
+      try {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        const prevVol = el.volume;
+        el.volume = 0;
+        el.currentTime = 0;
+        const p = el.play();
+        if (p) p.then(() => { el.pause(); el.currentTime = 0; el.volume = prevVol; })
+                 .catch(() => { try { el.volume = prevVol; } catch(e2){} });
+      } catch(e) {}
+    }
+    // launch音は通常音量で再度トリガー
     try {
-      const el = document.getElementById(id);
-      if (!el) continue;
-      const prevVol = el.volume;
-      el.volume = 0;
-      el.currentTime = 0;
-      const p = el.play();
-      if (p) p.then(() => { el.pause(); el.currentTime = 0; el.volume = prevVol; })
-               .catch(() => { try { el.volume = prevVol; } catch(e2){} });
+      const el = _launchAudio;
+      if (el) {
+        const p2 = el.play();
+        if (p2) p2.then(() => {
+          el.pause(); el.currentTime = 0; el.volume = 1.0;
+          if (state === 'start' && currentBgmFile !== 'apex.mp3') startScreenBgmPlay();
+        }).catch(() => { try { el.volume = 1.0; } catch(e2){} });
+      }
     } catch(e) {}
   }
-
-  // launch音は通常音量で再度トリガー（上記でサイレント再生済みなので確実に鳴る）
-  try {
-    const el = _launchAudio;
-    if (el) {
-      // アンロック完了後、スタート画面かつBGM未再生なら apex.mp3 を再生開始
-      const p2 = el.play();
-      if (p2) p2.then(() => {
-        el.pause(); el.currentTime = 0; el.volume = 1.0;
-        if (state === 'start' && currentBgmFile !== 'apex.mp3') startScreenBgmPlay();
-      }).catch(() => { try { el.volume = 1.0; } catch(e2){} });
-    }
-  } catch(e) {}
 }
 
 // ステージ番号(1-7)に対応するmissionのブロックをランダム取得
@@ -1162,72 +1200,238 @@ function buildStarCaches(bgHue) {
       const h1 = bgHue;
       const h2 = (bgHue + 40)  % 360; // 類似色
       const h3 = (bgHue + 200) % 360; // 補色系
+      const h4 = (bgHue + 120) % 360; // 三角補色
 
-      // ネビュラ定義：位置・サイズ・傾き・主色・副色
+      // ── 天の川（帯状の淡い星雲）──
+      {
+        c.save();
+        c.globalCompositeOperation = 'screen';
+        // 斜め帯として天の川を描く（H*2 の範囲で対角線に）
+        const mwAngle = 0.38; // ラジアン（約22度）
+        const mwX = W * 0.35;
+        const mwWidth = W * 0.38;
+
+        for (let band = 0; band < 3; band++) {
+          const bx = mwX + band * W * 0.12;
+          const alpha = [0.055, 0.035, 0.028][band];
+          const bw    = [mwWidth, mwWidth*0.6, mwWidth*0.3][band];
+          // 帯を傾けて描画
+          c.save();
+          c.translate(W/2, H);
+          c.rotate(mwAngle);
+          const mwG = c.createLinearGradient(-bw, 0, bw, 0);
+          mwG.addColorStop(0,   'rgba(0,0,0,0)');
+          mwG.addColorStop(0.25,`hsla(${(h1+30)%360},50%,75%,${alpha})`);
+          mwG.addColorStop(0.5, `hsla(${(h1+20)%360},60%,85%,${alpha*1.8})`);
+          mwG.addColorStop(0.75,`hsla(${h2},45%,70%,${alpha})`);
+          mwG.addColorStop(1,   'rgba(0,0,0,0)');
+          c.fillStyle = mwG;
+          c.fillRect(-bw, -H*2.2, bw*2, H*4.4);
+          c.restore();
+        }
+
+        // 天の川に密な微小星を散布
+        for (let i = 0; i < 280; i++) {
+          // 帯状分布：正規分布近似
+          const u1 = Math.random(), u2 = Math.random();
+          const gauss = Math.sqrt(-2*Math.log(u1+0.0001)) * Math.cos(2*Math.PI*u2);
+          const tx = W * 0.35 + gauss * W * 0.10 + (Math.random()*H*2 - H) * Math.tan(mwAngle);
+          const ty = Math.random() * H * 2;
+          const tr = 0.15 + Math.random() * 0.55;
+          const ta = 0.1 + Math.random() * 0.35;
+          c.globalAlpha = ta;
+          c.fillStyle = Math.random() < 0.3
+            ? `hsl(${200+Math.random()*60},80%,90%)` // 青白い星
+            : `hsl(${30+Math.random()*30},70%,90%)`; // 黄白い星
+          c.beginPath(); c.arc(tx, ty, tr, 0, Math.PI*2); c.fill();
+        }
+        c.globalAlpha = 1;
+        c.restore();
+      }
+
+      // ── 遠方銀河（小さな楕円・2〜4個）──
+      {
+        c.save();
+        c.globalCompositeOperation = 'screen';
+        const galaxies = [
+          { x: W*0.15, y: H*0.30, rx: 18, ry: 7,  rot: 0.4,  hue: h3, alpha: 0.18 },
+          { x: W*0.82, y: H*0.55, rx: 14, ry: 5,  rot: -0.3, hue: h4, alpha: 0.15 },
+          { x: W*0.60, y: H*1.20, rx: 22, ry: 8,  rot: 0.6,  hue: h2, alpha: 0.14 },
+          { x: W*0.28, y: H*1.75, rx: 12, ry: 4,  rot: -0.5, hue: h1, alpha: 0.12 },
+        ];
+        for (const gx of galaxies) {
+          c.save();
+          c.translate(gx.x, gx.y);
+          c.rotate(gx.rot);
+          // 外層ハロー
+          const g0 = c.createRadialGradient(0, 0, 0, 0, 0, gx.rx * 1.8);
+          g0.addColorStop(0,   `hsla(${gx.hue},70%,75%,${gx.alpha * 0.4})`);
+          g0.addColorStop(1,   'rgba(0,0,0,0)');
+          c.scale(1, gx.ry / gx.rx);
+          c.fillStyle = g0;
+          c.beginPath(); c.arc(0, 0, gx.rx * 1.8, 0, Math.PI*2); c.fill();
+          c.scale(1, gx.rx / gx.ry); // スケールを戻す
+
+          // 銀河本体（明るいコア）
+          const g1 = c.createRadialGradient(0, 0, 0, 0, 0, gx.rx);
+          g1.addColorStop(0,   `hsla(${gx.hue},80%,95%,${gx.alpha * 1.4})`);
+          g1.addColorStop(0.3, `hsla(${gx.hue},70%,80%,${gx.alpha})`);
+          g1.addColorStop(1,   'rgba(0,0,0,0)');
+          c.scale(1, gx.ry / gx.rx);
+          c.fillStyle = g1;
+          c.beginPath(); c.arc(0, 0, gx.rx, 0, Math.PI*2); c.fill();
+
+          // 渦状腕（2本）
+          for (let arm = 0; arm < 2; arm++) {
+            const armOff = arm * Math.PI;
+            for (let j = 0; j < 40; j++) {
+              const t2 = j / 40;
+              const angle = armOff + t2 * Math.PI * 1.2;
+              const dist2 = gx.rx * 0.15 + t2 * gx.rx * 0.9;
+              const sx = Math.cos(angle) * dist2;
+              const sy = Math.sin(angle) * dist2 * (gx.ry / gx.rx);
+              const sr = 0.5 + (1 - t2) * 1.5;
+              const sa = (1 - t2) * gx.alpha * 0.7;
+              c.scale(1, gx.rx / gx.ry);
+              c.globalAlpha = sa;
+              c.fillStyle = `hsl(${gx.hue},80%,90%)`;
+              c.beginPath(); c.arc(sx, sy * (gx.ry / gx.rx), sr, 0, Math.PI*2); c.fill();
+              c.scale(1, gx.ry / gx.rx);
+            }
+          }
+          c.globalAlpha = 1;
+          c.restore();
+        }
+        c.restore();
+      }
+
+      // ── ネビュラ本体（定義：位置・サイズ・傾き・主色・副色）──
       const nebulas = [
-        { x:W*0.30, y:H*0.22, rx:95, ry:58, rot:-0.35, hA:h1, hB:h2 },
-        { x:W*0.75, y:H*0.65, rx:78, ry:50, rot: 0.50, hA:h3, hB:h1 },
-        { x:W*0.18, y:H*0.88, rx:65, ry:42, rot:-0.20, hA:h2, hB:h3 },
-        { x:W*0.55, y:H*1.35, rx:90, ry:55, rot: 0.30, hA:h1, hB:h3 },
-        { x:W*0.80, y:H*1.72, rx:70, ry:44, rot:-0.45, hA:h3, hB:h2 },
-        { x:W*0.25, y:H*1.88, rx:60, ry:38, rot: 0.15, hA:h2, hB:h1 },
+        { x:W*0.30, y:H*0.22, rx:110, ry:65, rot:-0.35, hA:h1, hB:h2 },
+        { x:W*0.75, y:H*0.65, rx: 90, ry:55, rot: 0.50, hA:h3, hB:h1 },
+        { x:W*0.18, y:H*0.88, rx: 75, ry:48, rot:-0.20, hA:h2, hB:h3 },
+        { x:W*0.55, y:H*1.35, rx:105, ry:62, rot: 0.30, hA:h1, hB:h3 },
+        { x:W*0.80, y:H*1.72, rx: 82, ry:50, rot:-0.45, hA:h3, hB:h2 },
+        { x:W*0.25, y:H*1.88, rx: 70, ry:44, rot: 0.15, hA:h2, hB:h1 },
       ];
 
       c.save();
-      c.globalCompositeOperation = 'screen'; // 重ねるほど明るく・宇宙らしい発光感
+      c.globalCompositeOperation = 'screen';
 
       for (const nb of nebulas) {
         c.save();
-        // 傾き
         c.translate(nb.x, nb.y);
         c.rotate(nb.rot);
         c.translate(-nb.x, -nb.y);
 
-        // ── 外層：大きく薄いハロー
-        const g0 = c.createRadialGradient(nb.x, nb.y, 0, nb.x, nb.y, nb.rx * 1.6);
-        g0.addColorStop(0,   `hsla(${nb.hA},70%,40%,0.07)`);
-        g0.addColorStop(0.6, `hsla(${nb.hB},60%,30%,0.04)`);
-        g0.addColorStop(1,   'rgba(0,0,0,0)');
-        c.save();
-        c.scale(1, nb.ry / nb.rx);
-        c.fillStyle = g0;
-        c.beginPath(); c.arc(nb.x, nb.y * nb.rx/nb.ry, nb.rx*1.6, 0, Math.PI*2); c.fill();
-        c.restore();
+        // ── 超外層：非常に広い薄いハロー（実際の星雲の広がり）
+        {
+          const g = c.createRadialGradient(nb.x, nb.y, 0, nb.x, nb.y, nb.rx * 2.5);
+          g.addColorStop(0,   `hsla(${nb.hA},55%,35%,0.05)`);
+          g.addColorStop(0.5, `hsla(${nb.hB},45%,25%,0.03)`);
+          g.addColorStop(1,   'rgba(0,0,0,0)');
+          c.save(); c.scale(1, nb.ry / nb.rx);
+          c.fillStyle = g;
+          c.beginPath(); c.arc(nb.x, nb.y * nb.rx/nb.ry, nb.rx*2.5, 0, Math.PI*2); c.fill();
+          c.restore();
+        }
 
-        // ── 中層：本体のガス雲（やや濃い）
-        const g1 = c.createRadialGradient(nb.x, nb.y, 0, nb.x, nb.y, nb.rx);
-        g1.addColorStop(0,   `hsla(${nb.hA},80%,55%,0.22)`);
-        g1.addColorStop(0.4, `hsla(${nb.hA},70%,40%,0.14)`);
-        g1.addColorStop(0.75,`hsla(${nb.hB},60%,30%,0.07)`);
-        g1.addColorStop(1,   'rgba(0,0,0,0)');
-        c.save();
-        c.scale(1, nb.ry / nb.rx);
-        c.fillStyle = g1;
-        c.beginPath(); c.arc(nb.x, nb.y * nb.rx/nb.ry, nb.rx, 0, Math.PI*2); c.fill();
-        c.restore();
+        // ── 外層ハロー
+        {
+          const g = c.createRadialGradient(nb.x, nb.y, 0, nb.x, nb.y, nb.rx * 1.7);
+          g.addColorStop(0,   `hsla(${nb.hA},65%,42%,0.10)`);
+          g.addColorStop(0.5, `hsla(${nb.hB},55%,32%,0.06)`);
+          g.addColorStop(1,   'rgba(0,0,0,0)');
+          c.save(); c.scale(1, nb.ry / nb.rx);
+          c.fillStyle = g;
+          c.beginPath(); c.arc(nb.x, nb.y * nb.rx/nb.ry, nb.rx*1.7, 0, Math.PI*2); c.fill();
+          c.restore();
+        }
+
+        // ── 中層：本体ガス雲
+        {
+          const g = c.createRadialGradient(nb.x, nb.y, 0, nb.x, nb.y, nb.rx);
+          g.addColorStop(0,   `hsla(${nb.hA},82%,58%,0.30)`);
+          g.addColorStop(0.3, `hsla(${nb.hA},74%,44%,0.20)`);
+          g.addColorStop(0.6, `hsla(${nb.hB},62%,33%,0.12)`);
+          g.addColorStop(1,   'rgba(0,0,0,0)');
+          c.save(); c.scale(1, nb.ry / nb.rx);
+          c.fillStyle = g;
+          c.beginPath(); c.arc(nb.x, nb.y * nb.rx/nb.ry, nb.rx, 0, Math.PI*2); c.fill();
+          c.restore();
+        }
 
         // ── 内層：明るいコア（星形成領域）
-        const g2 = c.createRadialGradient(nb.x, nb.y, 0, nb.x, nb.y, nb.rx * 0.35);
-        g2.addColorStop(0,   `hsla(${nb.hA},90%,80%,0.28)`);
-        g2.addColorStop(0.5, `hsla(${nb.hA},80%,60%,0.14)`);
-        g2.addColorStop(1,   'rgba(0,0,0,0)');
-        c.fillStyle = g2;
-        c.beginPath(); c.arc(nb.x, nb.y, nb.rx*0.35, 0, Math.PI*2); c.fill();
+        {
+          const g = c.createRadialGradient(nb.x, nb.y, 0, nb.x, nb.y, nb.rx * 0.38);
+          g.addColorStop(0,   `hsla(${nb.hA},95%,88%,0.40)`);
+          g.addColorStop(0.4, `hsla(${nb.hA},85%,65%,0.22)`);
+          g.addColorStop(1,   'rgba(0,0,0,0)');
+          c.fillStyle = g;
+          c.beginPath(); c.arc(nb.x, nb.y, nb.rx*0.38, 0, Math.PI*2); c.fill();
+        }
 
-        // ── ダスト：不規則な小塊を数個散らす（ガスの凹凸感）
-        const clumps = 4 + Math.floor(Math.random()*3);
+        // ── フィラメント（ガス雲の筋・光の柱）
+        const filCount = 5 + Math.floor(Math.random() * 4);
+        for (let fi = 0; fi < filCount; fi++) {
+          const angle = (fi / filCount) * Math.PI * 2 + Math.random() * 0.5;
+          const startDist = nb.rx * (0.05 + Math.random() * 0.15);
+          const endDist   = nb.rx * (0.5  + Math.random() * 0.7);
+          const fx1 = nb.x + Math.cos(angle) * startDist;
+          const fy1 = nb.y + Math.sin(angle) * startDist * (nb.ry/nb.rx);
+          const fx2 = nb.x + Math.cos(angle + (Math.random()-0.5)*0.6) * endDist;
+          const fy2 = nb.y + Math.sin(angle + (Math.random()-0.5)*0.6) * endDist * (nb.ry/nb.rx);
+          const hF = Math.random() < 0.5 ? nb.hA : nb.hB;
+          const filG = c.createLinearGradient(fx1, fy1, fx2, fy2);
+          filG.addColorStop(0,   `hsla(${hF},80%,75%,0.22)`);
+          filG.addColorStop(0.6, `hsla(${hF},70%,55%,0.10)`);
+          filG.addColorStop(1,   'rgba(0,0,0,0)');
+          c.save();
+          c.strokeStyle = filG;
+          c.lineWidth = 0.8 + Math.random() * 1.5;
+          c.globalAlpha = 0.6;
+          // やや曲がった線（制御点を少しずらす）
+          const cpx = (fx1+fx2)/2 + (Math.random()-0.5)*nb.rx*0.3;
+          const cpy = (fy1+fy2)/2 + (Math.random()-0.5)*nb.ry*0.3;
+          c.beginPath(); c.moveTo(fx1, fy1);
+          c.quadraticCurveTo(cpx, cpy, fx2, fy2);
+          c.stroke();
+          c.restore();
+        }
+
+        // ── ダスト：不規則な小塊（ガスの凹凸感）
+        const clumps = 6 + Math.floor(Math.random()*4);
         for (let ci = 0; ci < clumps; ci++) {
           const angle = (ci / clumps) * Math.PI * 2 + Math.random();
-          const dist  = nb.rx * (0.15 + Math.random() * 0.55);
-          const cx2   = nb.x + Math.cos(angle) * dist;
-          const cy2   = nb.y + Math.sin(angle) * dist * (nb.ry/nb.rx);
-          const cr    = nb.rx * (0.08 + Math.random() * 0.18);
+          const dist2 = nb.rx * (0.12 + Math.random() * 0.60);
+          const cx2   = nb.x + Math.cos(angle) * dist2;
+          const cy2   = nb.y + Math.sin(angle) * dist2 * (nb.ry/nb.rx);
+          const cr    = nb.rx * (0.06 + Math.random() * 0.20);
           const hC    = Math.random() < 0.5 ? nb.hA : nb.hB;
           const gc = c.createRadialGradient(cx2, cy2, 0, cx2, cy2, cr);
-          gc.addColorStop(0,  `hsla(${hC},75%,65%,0.18)`);
+          gc.addColorStop(0,  `hsla(${hC},78%,68%,0.24)`);
+          gc.addColorStop(0.6,`hsla(${hC},65%,50%,0.10)`);
           gc.addColorStop(1,  'rgba(0,0,0,0)');
           c.fillStyle = gc;
           c.beginPath(); c.arc(cx2, cy2, cr, 0, Math.PI*2); c.fill();
+        }
+
+        // ── 星雲内の輝星（HII領域の高温星）
+        const hotStars = 2 + Math.floor(Math.random() * 4);
+        for (let si = 0; si < hotStars; si++) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist2 = nb.rx * Math.random() * 0.5;
+          const sx = nb.x + Math.cos(angle) * dist2;
+          const sy = nb.y + Math.sin(angle) * dist2 * (nb.ry/nb.rx);
+          const sr = 0.8 + Math.random() * 1.5;
+          const sg = c.createRadialGradient(sx, sy, 0, sx, sy, sr * 5);
+          sg.addColorStop(0,   `hsla(${nb.hA},100%,100%,0.95)`);
+          sg.addColorStop(0.2, `hsla(${nb.hA},90%,85%,0.40)`);
+          sg.addColorStop(1,   'rgba(0,0,0,0)');
+          c.fillStyle = sg;
+          c.beginPath(); c.arc(sx, sy, sr * 5, 0, Math.PI*2); c.fill();
+          c.fillStyle = `hsla(${nb.hA},100%,100%,1)`;
+          c.beginPath(); c.arc(sx, sy, sr, 0, Math.PI*2); c.fill();
         }
 
         c.restore();
@@ -3758,9 +3962,10 @@ function checkCollisions(){
     if(hit){
       d.alive=false; energy=Math.max(0,energy-ENERGY_HIT_COST); life=Math.round(energy/ENERGY_MAX*LIFE_MAX); hitFlash=0.5;
       addMeteorDebris(d.x, d.y, d.r);
-      playMeteorHitSE();
+      // SE再生を次フレームに遅延してフリーズ防止
+      requestAnimationFrame(() => playMeteorHitSE());
       shakeX=(Math.random()-0.5)*12; shakeY=(Math.random()-0.5)*8;
-      setTimeout(()=>{shakeX=0;shakeY=0;},200);
+      setTimeout(()=>{shakeX=0;shakeY=0;},180);
     }
   }
   for(const it of items){
@@ -3777,7 +3982,8 @@ function checkCollisions(){
     if(hit){
       it.alive=false;
       if(it.isHeart){
-        stopBgm(); // ハート取得時にBGM即停止
+        // BGM停止を次フレームに遅延してメインスレッドのブロックを防ぐ
+        requestAnimationFrame(() => stopBgm());
         if(it.isCorrect){ energy=Math.min(ENERGY_MAX,energy+ENERGY_HEART_GAIN); life=Math.round(energy/ENERGY_MAX*LIFE_MAX); pickupFlash=0.5; playCorrectSE(); hintDismissed=true; }
         else            { energy=Math.max(0,energy-ENERGY_WRONG_COST); life=Math.round(energy/ENERGY_MAX*LIFE_MAX); hitFlash=0.4; playWrongSE(); }
       } else {

@@ -1121,18 +1121,7 @@ for(let i=0;i<25;i++){
   BG_STARS.push({x:Math.random()*W, y:Math.random()*H, r:Math.random()*1.8+0.4, a:0.55+Math.random()*0.45,
     color:`rgb(${rb},${rb},255)`});
 }
-const NEBULAS=[];
-for(let i=0;i<3;i++) {
-  NEBULAS.push({
-    x: Math.random() * W,
-    y: Math.random() * H,
-    rx: 80 + Math.random() * 120,
-    ry: 40 + Math.random() * 70,
-    rot: Math.random() * Math.PI,
-    a: Math.random() * 0.13 + 0.06,
-    speed: 0.008 + Math.random() * 0.012
-  });
-}
+// ネビュラ廃止（軽量化）
 
 // ===== 流れ星・ハレー彗星 =====
 let shootingStars = [];
@@ -1409,7 +1398,7 @@ function drawSuckingObjects(){
     ctx.rotate(s.rot);
     ctx.scale(s.scale, s.scale);
     if(s.type === 'debris'){
-      ctx.filter = 'brightness(1.4) contrast(1.2)';
+      // ctx.filter 廃止（軽量化）
       if(meteoriteImg.complete && meteoriteImg.naturalWidth > 0){
         const sz = s.origR * 2.4;
         ctx.drawImage(meteoriteImg, -sz/2, -sz/2, sz, sz);
@@ -1805,25 +1794,6 @@ function drawStars(){
   const hue = st().bgHue;
   ctx.fillStyle = '#000a1a'; 
   ctx.fillRect(0, 0, W, H);
-
-  // 星雲（ネビュラ）：楕円＋ラジアルグラデーションで自然な雲状に描画
-  for(const n of NEBULAS){
-    const gy = ((n.y + starScroll * n.speed) % (H + n.ry * 2)) - n.ry;
-    ctx.save();
-    ctx.translate(n.x, gy);
-    ctx.rotate(n.rot);
-    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, n.rx);
-    grad.addColorStop(0,   `hsla(${hue}, 70%, 65%, ${n.a})`);
-    grad.addColorStop(0.45,`hsla(${hue+30}, 60%, 55%, ${n.a * 0.6})`);
-    grad.addColorStop(1,   `hsla(${hue}, 50%, 40%, 0)`);
-    ctx.scale(1, n.ry / n.rx);
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(0, 0, n.rx, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
 
   for(const s of BG_STARS){
     const layerSpeed = s.r * 0.15;
@@ -2304,7 +2274,7 @@ function drawParticles(){
 function drawMeteor(d){
   ctx.save(); ctx.translate(d.x,d.y); ctx.rotate(d.rot);
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  ctx.filter='brightness(1.4) contrast(1.2)'; ctx.scale(-1,1);
+  ctx.scale(-1,1);
   if(meteoriteImg.complete&&meteoriteImg.naturalWidth>0){
     const s=d.r*2.4; ctx.drawImage(meteoriteImg,-s/2,-s/2,s,s);
   }else{
@@ -3330,24 +3300,19 @@ function drawAstronaut(a){
 
   ctx.save();
   ctx.globalAlpha = a.captureAlpha !== undefined ? a.captureAlpha : 1;
-  ctx.shadowBlur = 15;
-  ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
-
   ctx.translate(a.x, a.y);
   const sc = (a.captureScale !== undefined && a.captureScale < 1) ? a.captureScale : 1;
   if(sc < 1) ctx.scale(sc, sc);
 
-  // ！マーク（捕獲中は非表示）
+  // SOSテキスト（捕獲中は非表示）
   if(a.mode !== 'being_pulled'){
     const blink = Math.sin(Date.now() * 0.004) > 0;
     if(blink){
       ctx.save();
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = '#0f0';
-      ctx.fillStyle = '#aaffaa';
-      ctx.font = "bold 16px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
+      ctx.fillStyle = '#fff9ba';
+      ctx.font = "bold 14px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
       ctx.textAlign = 'center';
-      ctx.fillText('！', 0, -45);
+      ctx.fillText('SOS', 0, -45);
       ctx.restore();
     }
   }
@@ -3633,8 +3598,6 @@ function drawProgressMap(completedMissions, yOffset){
     if(isGoal && completedMissions >= N - 1){
       const pulse = 0.7 + 0.3 * Math.abs(Math.sin(_uiTime * 2.2));
       ctx.save();
-      ctx.shadowColor = `rgba(100,255,180,${0.7 * pulse})`;
-      ctx.shadowBlur = 6 * pulse;
       ctx.strokeStyle = `rgba(100,255,180,${0.85 * pulse})`;
       ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(x, lineY, iconR + 2, 0, Math.PI * 2); ctx.stroke();
@@ -3646,8 +3609,6 @@ function drawProgressMap(completedMissions, yOffset){
       ctx.save();
       ctx.strokeStyle = 'rgba(255,255,180,0.95)';
       ctx.lineWidth = 2;
-      ctx.shadowColor = 'rgba(255,255,100,0.9)';
-      ctx.shadowBlur = 8;
       ctx.beginPath(); ctx.arc(x, lineY, iconR + 4, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     }

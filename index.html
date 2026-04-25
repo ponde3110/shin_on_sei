@@ -1115,13 +1115,82 @@ const ENERGY_BH_COST=0;    // ブラックホール接触時のエネルギー�
 const ENERGY_HEART_GAIN=25; // 正解ハート取得時のエネルギー回復
 const ENERGY_RESCUE_GAIN=50;// 宇宙飛行士救助時のエネルギー回復
 
-const BG_STARS=[];
-for(let i=0;i<25;i++){
-  const rb = 180 + Math.random() * 20 | 0;
-  BG_STARS.push({x:Math.random()*W, y:Math.random()*H, r:Math.random()*1.8+0.4, a:0.55+Math.random()*0.45,
-    color:`rgb(${rb},${rb},255)`});
+// ===== 星背景：3レイヤー オフスクリーンキャッシュ =====
+// 各レイヤーは高さ H*2 のオフスクリーンCanvasにタイル描画済み。
+// 毎フレームは drawImage x2 ずつ（タイルループ）のみ。
+// ステージ切り替え時に bgHue に合わせて再生成する。
+
+const STAR_LAYERS = [
+  // [スクロール速度係数, 星数, 最小r, 最大r, 透明度範囲, ネビュラ描画]
+  { speed: 0.08, count: 40, rMin: 0.3, rMax: 0.9, aMin: 0.25, aMax: 0.55, nebula: true  }, // 遠景
+  { speed: 0.20, count: 28, rMin: 0.6, rMax: 1.3, aMin: 0.45, aMax: 0.75, nebula: false }, // 中景
+  { speed: 0.42, count: 14, rMin: 1.0, rMax: 2.0, aMin: 0.65, aMax: 1.00, nebula: false }, // 近景
+];
+
+let _starCaches = [null, null, null]; // オフスクリーンCanvas x3
+let _starCacheBgHue = -1;             // 最後にキャッシュ生成したhue
+
+function buildStarCaches(bgHue) {
+  if (_starCacheBgHue === bgHue && _starCaches[0]) return; // 同じhueなら再生成しない
+  _starCacheBgHue = bgHue;
+
+  STAR_LAYERS.forEach((layer, li) => {
+    const oc = document.createElement('canvas');
+    oc.width  = W;
+    oc.height = H * 2; // タイル高さ（2倍でシームレスループ）
+    const c = oc.getContext('2d');
+    c.clearRect(0, 0, W, H * 2);
+
+    // ── ネビュラ（遠景レイヤーのみ）
+    if (layer.nebula) {
+      const nebulas = [
+        { x: W*0.25, y: H*0.30, rx: 70, ry: 55 },
+        { x: W*0.72, y: H*0.70, rx: 55, ry: 45 },
+        { x: W*0.50, y: H*1.40, rx: 80, ry: 60 }, // タイル下半分
+        { x: W*0.20, y: H*1.80, rx: 50, ry: 40 },
+      ];
+      for (const nb of nebulas) {
+        // 色相をbgHueに基づいて変化させる
+        const h1 = (bgHue + 20)  % 360;
+        const h2 = (bgHue + 200) % 360;
+        const g = c.createRadialGradient(nb.x, nb.y, 0, nb.x, nb.y, Math.max(nb.rx, nb.ry));
+        g.addColorStop(0,   `hsla(${h1},60%,35%,0.18)`);
+        g.addColorStop(0.5, `hsla(${h2},50%,25%,0.10)`);
+        g.addColorStop(1,   'rgba(0,0,0,0)');
+        c.save();
+        c.scale(1, nb.ry / nb.rx); // 楕円形に
+        c.fillStyle = g;
+        c.beginPath();
+        c.arc(nb.x, nb.y * (nb.rx / nb.ry), nb.rx, 0, Math.PI * 2);
+        c.fill();
+        c.restore();
+      }
+    }
+
+    // ── 星を H*2 の範囲にランダム配置
+    for (let i = 0; i < layer.count; i++) {
+      const x = Math.random() * W;
+      const y = Math.random() * H * 2;
+      const r = layer.rMin + Math.random() * (layer.rMax - layer.rMin);
+      const a = layer.aMin + Math.random() * (layer.aMax - layer.aMin);
+      // 大きい星だけ淡いグロー（キャッシュ内なので毎フレームコストなし）
+      if (r >= 1.2) {
+        const glow = c.createRadialGradient(x, y, 0, x, y, r * 3);
+        const rb = 180 + Math.random() * 30 | 0;
+        glow.addColorStop(0,   `rgba(${rb},${rb},255,${a * 0.6})`);
+        glow.addColorStop(1,   'rgba(0,0,40,0)');
+        c.fillStyle = glow;
+        c.beginPath(); c.arc(x, y, r * 3, 0, Math.PI * 2); c.fill();
+      }
+      c.globalAlpha = a;
+      c.fillStyle = '#ffffff';
+      c.beginPath(); c.arc(x, y, Math.max(0.5, r * 0.6), 0, Math.PI * 2); c.fill();
+      c.globalAlpha = 1;
+    }
+
+    _starCaches[li] = oc;
+  });
 }
-// ネビュラ廃止（軽量化）
 
 // ===== 流れ星・ハレー彗星 =====
 let shootingStars = [];
@@ -1789,27 +1858,29 @@ function addMeteorDebris(cx, cy, r) {
   }
 }
 
-// --- 星背景の修正（パララックス効果） ---
+// --- 星背景：キャッシュをタイル貼りで描画（毎フレームの重い計算ゼロ）---
 function drawStars(){
-  const hue = st().bgHue;
-  ctx.fillStyle = '#000a1a'; 
+  const bgHue = st().bgHue;
+
+  // キャッシュが未生成 or ステージ変化時のみ再生成
+  buildStarCaches(bgHue);
+
+  // 背景塗りつぶし
+  ctx.fillStyle = '#000a1a';
   ctx.fillRect(0, 0, W, H);
 
-  for(const s of BG_STARS){
-    const layerSpeed = s.r * 0.15;
-    const sy = (s.y + starScroll * layerSpeed) % (H + 10);
-
-    ctx.save();
-    ctx.globalAlpha = s.a;
-
-    // すべての星をシンプルな点として描画（グロー廃止・軽量化）
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(s.x, sy, Math.max(0.5, s.r * 0.6), 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+  // 各レイヤーを速度差でタイルスクロール（drawImage x2 ずつ）
+  for (let li = 0; li < STAR_LAYERS.length; li++) {
+    const cache = _starCaches[li];
+    if (!cache) continue;
+    const spd = STAR_LAYERS[li].speed;
+    // タイル高さ H*2 の中での現在オフセット
+    const offset = (starScroll * spd) % (H * 2);
+    // 1枚目（通常位置）
+    ctx.drawImage(cache, 0, offset - H * 2);
+    // 2枚目（シームレスループのため連続貼り）
+    ctx.drawImage(cache, 0, offset);
   }
-  ctx.globalAlpha = 1;
 }
 
 // ===== 流れ星・ハレー彗星の更新と描画 =====
@@ -2174,31 +2245,7 @@ function drawRocketAt(cx,cy,showFlame,tilt){
   if(t) ctx.rotate(t);
   ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
 
-  const absTilt=Math.abs(t);
-  if(absTilt>0.04){
-    const dir=t>0?-1:1; 
-    const ft=Date.now()*0.022;
-    const fLen=10+absTilt/0.62*22+Math.sin(ft)*3;
-    const fW=3+absTilt/0.62*4+Math.sin(ft*1.4)*1.2;
-    const alpha=Math.min(1,absTilt/0.08)*0.9;
-
-    ctx.globalAlpha=alpha*0.35;
-    ctx.fillStyle=`rgba(255,140,0,0.4)`;
-    // ↓ ここが修正箇所：全角の「−」を半角の「-」に変更
-    ctx.beginPath(); ctx.ellipse(dir*26,-14+Math.sin(ft)*3,fLen*0.7,fW*1.8,0,0,Math.PI*2); ctx.fill();
-
-    ctx.globalAlpha=alpha*0.9;
-    const sg=ctx.createLinearGradient(dir*20,0,dir*(20+fLen),0);
-    sg.addColorStop(0,'#ffffff');
-    sg.addColorStop(0.25,'#ffee44');
-    sg.addColorStop(0.6,'#ff6600');
-    sg.addColorStop(1,'rgba(255,0,0,0)');
-    ctx.fillStyle=sg;
-    // ↓ ここも修正箇所：全角の「−」を半角の「-」に変更
-    ctx.beginPath(); ctx.ellipse(dir*(20+fLen*0.45),-14+Math.sin(ft*1.1)*2,fLen*0.55,fW,0,0,Math.PI*2); ctx.fill();
-    ctx.globalAlpha=1;
-  }
-  // (以下、rocketImgの描画処理などはそのまま)
+  // サイドスラスター炎：削除済み
   if(rocketImg.complete&&rocketImg.naturalWidth>0){
     ctx.drawImage(rocketImg,-29,-61,58,95);
   }else{
@@ -4282,6 +4329,7 @@ function startStage(idx){
   spawnTimer=1.5; hitFlash=0; pickupFlash=0; shakeX=0; shakeY=0;
   launchT=0; arriveT=0; bgDestLastR=0; bgDestLastY=0;
   starScroll=0; state='launch_anim';
+  _starCacheBgHue = -1; // ステージ切り替え時に星キャッシュを再生成させる
   shootingStars=[]; shootingStarTimer=1+Math.random()*3;
   { // ハレー彗星タイマー初期値（ミッション1は使わない、2以降はidに応じて短縮）
     const sid = STAGES[idx] ? STAGES[idx].id : 1;

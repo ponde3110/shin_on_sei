@@ -129,6 +129,7 @@ html, body {
   will-change: transform, filter;
   /* 実測値: 周期893ms / S1→S2=328ms(収縮) / S2→静止=261ms(拡張) / 静止304ms
      animation-delay: -164ms でS1タイミングに位相合わせ */
+  transform: translate(-50%, -50%) scale(1.0);  /* animation停止中のデフォルト位置 */
   animation: heartContract 893ms ease-in-out infinite;
   animation-play-state: paused;
   animation-delay: -164ms;
@@ -507,9 +508,12 @@ html, body {
     0 0 55px rgba(255,60,140,0.5);
 }
 
-/* 初期状態: startBtn・Canvas は拍動開始後まで非表示 */
+/* 初期状態: Canvas・startBtn・心臓星ラップは拍動開始後まで非表示 */
 #rc.pre-beat { visibility: hidden; }
 #startBtn.pre-beat { display: none !important; }
+#heartPlanetWrap.pre-beat { visibility: hidden; }
+#heartPlanetWrap { transition: visibility 0s, opacity 0.4s ease; }
+#heartPlanetWrap.beat-visible { opacity: 1; }
 
 .confetti {
   position: absolute;
@@ -602,7 +606,10 @@ const ctx=cv.getContext('2d');
 const W=320,H=520;
 
 // デバイスピクセル比（Retina/iPad対応）
-const DPR = Math.min(window.devicePixelRatio || 1, 2);
+let DPR = window.devicePixelRatio || 1;
+
+if (DPR > 1.5) DPR = 1.5;   // ← 上限を下げる
+if (/iPad|iPhone/.test(navigator.userAgent)) DPR = 1.2; // ← iOSはさらに軽く
 
 // canvasの物理解像度をDPRに合わせてスケールアップ
 cv.width  = W * DPR;
@@ -943,16 +950,11 @@ function startScreenBgmPlay() {
   playBgm('apex.mp3');
   const hp = document.getElementById('heartPlanet');
   if (!hp) return;
-  // アニメを一度リセットしてから再開（位相をbgm先頭に合わせる）
-  hp.style.animationPlayState = 'paused';
-  hp.style.animation = 'none';
-  // 1フレーム後に再設定して位相リセット
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      hp.style.animation = '';
-      hp.style.animationPlayState = 'running';
-    });
-  });
+  // animation='none' を使うと transform がリセットされて位置がずれるため使わない
+  // inline styleで直接 running に切り替えるだけで拍動開始
+  hp.style.animation          = 'heartContract 893ms ease-in-out infinite';
+  hp.style.animationDelay     = '-164ms';
+  hp.style.animationPlayState = 'running';
 }
 function startScreenBgmStop() {
   stopBgm();
@@ -1114,13 +1116,13 @@ const ENERGY_HEART_GAIN=25; // 正解ハート取得時のエネルギー回復
 const ENERGY_RESCUE_GAIN=50;// 宇宙飛行士救助時のエネルギー回復
 
 const BG_STARS=[];
-for(let i=0;i<50;i++){
+for(let i=0;i<25;i++){
   const rb = 180 + Math.random() * 20 | 0;
   BG_STARS.push({x:Math.random()*W, y:Math.random()*H, r:Math.random()*1.8+0.4, a:0.55+Math.random()*0.45,
     color:`rgb(${rb},${rb},255)`});
 }
 const NEBULAS=[];
-for(let i=0;i<7;i++) {
+for(let i=0;i<3;i++) {
   NEBULAS.push({
     x: Math.random() * W,
     y: Math.random() * H,
@@ -3102,7 +3104,7 @@ function drawArriveAnim(){
     const a = Math.min(1, (t - 0.3) * 3);
     // 最終ミッション（心臓星）は明るいシアン、それ以外は白
     const isFinal = s.arriveText && s.arriveText.includes('心臓星');
-    ctx.fillStyle = isFinal ? `rgba(0,255,220,${a})` : `rgba(255,255,255,${a})`;
+    ctx.fillStyle = isFinal ? `rgba(255,160,60,${a})` : `rgba(255,255,255,${a})`;
     ctx.font = "bold 20px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
     ctx.textAlign = 'center';
     ctx.fillText(s.arriveText, W/2, H * 0.45);
@@ -4735,7 +4737,7 @@ function buildJourneyTrail() {
 
 // ファンファーレ（MP3版）
 function playFanfare() {
-  _playSE('seFanfareEl', 0.9);
+  _playSE('seFanfareEl', 0.55);
 }
 
 // 豪華紙吹雪
@@ -5004,7 +5006,7 @@ document.getElementById('startBtn').addEventListener('pointerdown', () => {
   const orbit    = document.getElementById('orbitPath');
   const startB   = document.getElementById('startBtn');
 
-  // 初期状態: Canvas・startBtn を隠す
+  // 初期状態: Canvas・startBtnのみ隠す（心臓星は最初から静止表示）
   canvas.classList.add('pre-beat');
   startB.classList.add('pre-beat');
 
@@ -5014,23 +5016,21 @@ document.getElementById('startBtn').addEventListener('pointerdown', () => {
   beatBtn.addEventListener('pointerdown', (e) => {
     e.stopPropagation();
 
-    // 1. 即座に非表示
+    // 1. ボタンを即非表示
     beatBtn.style.display = 'none';
 
-    // 2. オーディオアンロック＆apex.mp3 再生・拍動開始
+    // 2. オーディオアンロック＆apex.mp3 再生＋拍動開始（心臓星はすでに表示済み）
     _audioUnlocked = true;
     startScreenBgmPlay();
 
-    // 3. 聴診器をフェードイン
-    orbit.style.transition = 'opacity 1.2s ease';
-    orbit.style.opacity    = '1';
-    orbit.style.pointerEvents = '';
-
-    // 4. 少し待ってからCanvas・startBtnを表示
+    // 3. 2心拍（893ms × 2 ≒ 1800ms）後にCanvas・startBtn・聴診器を一斉表示
     setTimeout(() => {
       canvas.classList.remove('pre-beat');
       startB.classList.remove('pre-beat');
-    }, 900);
+      orbit.style.transition  = 'opacity 0.8s ease';
+      orbit.style.opacity     = '1';
+      orbit.style.pointerEvents = '';
+    }, 1800);
   }, { once: true });
 })();
 

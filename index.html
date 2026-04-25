@@ -23,6 +23,7 @@ html, body {
   overflow: hidden;
   font-family: var(--font-sans, -apple-system, sans-serif);
   -webkit-touch-callout: none;
+  touch-action: none;
 }
 
 /* ゲーム全体のラッパー：画面中央に縦長キャンバスを配置 */
@@ -33,6 +34,7 @@ html, body {
   justify-content: center;
   width: 100%;
   height: 100%;
+  touch-action: none;
   /* PCではmax-widthで横が広がりすぎないようにする */
 }
 
@@ -849,9 +851,13 @@ function _playSE(id, volume) {
   try {
     const el = document.getElementById(id);
     if (!el) return;
-    el.pause();
-    el.currentTime = 0;
     if (volume !== undefined) el.volume = volume;
+    // iOS: pause()直後のplay()はAbortErrorになる場合があるため
+    // currentTimeリセットのみ行い、pause中の場合は直接play()
+    if (!el.paused) {
+      el.pause();
+    }
+    el.currentTime = 0;
     const p = el.play();
     if (p) p.catch(() => {});
   } catch(e) {}
@@ -875,15 +881,15 @@ function unlockAudio() {
   if (_audioUnlocked) return;
   _audioUnlocked = true;
 
-  // ── iOS / Android / PC 共通方針 ──
-  // iOSで「ユーザージェスチャー内で複数の audio.play()」を呼ぶと、
-  // すべての <audio> 要素が一斉に再生されてしまう。
-  // 対策：アンロック時は BGM 用 Audio オブジェクト(bgm) を
-  // 無音で一度 play/pause するだけにとどめる。
-  // SE各要素 (<audio> タグ) は preload="auto" でバッファ済みなので、
-  // 実際に鳴らす瞬間に初めて play() を呼べば iOS でも確実に再生される。
+  // ── iOS / iPad / Android / PC 共通方針 ──
+  // iOSでは「ユーザージェスチャー内で play() を呼んだ audio 要素のみ」が
+  // 以降どのタイミングでも再生可能になる。
+  // 対策：アンロック時に全 <audio> 要素を volume=0 で play→pause して
+  // iOS に「この要素は再生許可済み」と登録させる。
+  // これにより、後からゲームロジックが _playSE() を呼んだときにも確実に鳴る。
+
+  // BGM用 Audio オブジェクト をアンロック
   try {
-    const prevSrc = bgm.src;
     const prevVol = bgm.volume;
     if (!bgm.src || bgm.src === location.href) {
       bgm.src = 'sound/apex.mp3';
@@ -909,6 +915,38 @@ function unlockAudio() {
       }
     }
   } catch(e) {}
+
+  // 全SE <audio> 要素を無音で play→pause してiOS/iPadにアンロック登録
+  const seIds = [
+    'launchAudioEl',
+    'seArriveEl','seCorrectEl','seWrongEl','seMissEl',
+    'seThrusterEl','seHalleyEl','seMeteorEl',
+    'seUfoAppearEl','seUfoLoopEl',
+    'seBhAppearEl','seBhLoopEl',
+    'seExplosionEl','seRescueEl','seFanfareEl'
+  ];
+  seIds.forEach(id => {
+    try {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const prevVol = el.volume;
+      el.volume = 0;
+      const p = el.play();
+      if (p) {
+        p.then(() => {
+          el.pause();
+          el.currentTime = 0;
+          el.volume = prevVol;
+        }).catch(() => {
+          try { el.volume = prevVol; } catch(e2) {}
+        });
+      } else {
+        el.pause();
+        el.currentTime = 0;
+        el.volume = prevVol;
+      }
+    } catch(e) {}
+  });
 }
 
 // ステージ番号(1-7)に対応するmissionのブロックをランダム取得
@@ -1051,6 +1089,7 @@ function startUfoLoopSound() {
     const el = document.getElementById('seUfoLoopEl');
     if (!el) return;
     el.volume = 0.15;
+    el.currentTime = 0;
     const p = el.play();
     if (p) p.catch(() => {});
   } catch(e) {}
@@ -1071,6 +1110,7 @@ function startBlackholeLoopSound() {
     const el = document.getElementById('seBhLoopEl');
     if (!el) return;
     el.volume = 0.6;
+    el.currentTime = 0;
     const p = el.play();
     if (p) p.catch(() => {});
   } catch(e) {}
@@ -4607,6 +4647,30 @@ cv.addEventListener('mousemove', (e) => {
 });
 
 // =========================
+// 画面座標 → ゲーム座標 変換ヘルパー
+// canvas の外側（黒帯部分）をタップした場合も
+// canvas の左端／右端にクランプしてゲーム座標を返す
+// =========================
+function clientToGame(clientX, clientY) {
+  const rect = cv.getBoundingClientRect();
+  const clampedX = Math.max(rect.left, Math.min(rect.right,  clientX));
+  const clampedY = Math.max(rect.top,  Math.min(rect.bottom, clientY));
+  const gx = (clampedX - rect.left) * (W / rect.width);
+  const gy = (clampedY - rect.top)  * (H / rect.height);
+  return { gx, gy };
+}
+
+// playing 中: 画面上のX座標からcanvasの中心を基準に左右を判定
+// canvas 外の黒帯タップ → 左帯なら左、右帯なら右として扱う
+function updateMoveKeys(clientX) {
+  const rect = cv.getBoundingClientRect();
+  const cvCenterX = rect.left + rect.width / 2;
+  keys['ArrowLeft']  = clientX < cvCenterX;
+  keys['ArrowRight'] = clientX >= cvCenterX;
+}
+
+
+// =========================
 // キーボード（変更なし）
 // =========================
 document.addEventListener('keydown',e=>{
@@ -4637,74 +4701,91 @@ document.addEventListener('keyup',e=>{
 });
 
 // =========================
-// タッチ開始（統一版）
+// タッチ開始（統一版・黒帯対応）
+// canvas 外の黒帯タップも受け付けるため document に登録する
 // =========================
-cv.addEventListener('touchstart', (e) => {
+document.addEventListener('touchstart', (e) => {
+  // ゲームUI要素（ボタン等）への操作は通常通り処理させる
+  const tag = e.target.tagName;
+  if (tag === 'BUTTON' || tag === 'A' || tag === 'INPUT') return;
+
+  // canvas または黒帯エリア（#rw/#rwrap）上のタッチのみ処理
+  const onGame = e.target === cv ||
+                 e.target.id === 'rw' ||
+                 e.target.id === 'rwrap' ||
+                 e.target === document.body ||
+                 e.target === document.documentElement;
+  if (!onGame) return;
+
   e.preventDefault();
-  // iOS: ジェスチャースコープを保持するため await せずに即座にアンロックし、
-  //      アクションも同一イベント内で実行する
   unlockAudio();
 
   const t = e.touches[0];
-  if(!t) return;
+  if (!t) return;
 
-  const rect = cv.getBoundingClientRect();
-  const mx = (t.clientX - rect.left) * (W / rect.width);
-  const my = (t.clientY - rect.top) * (H / rect.height);
+  if (state === 'launch_anim') return;
 
-  // 出発アニメ中は一切の入力を遮断（音声が途切れる問題の対策）
-  if(state === 'launch_anim') return;
-
-  // playing中はタッチ位置で左右移動を即開始
-  if(state === 'playing'){
-    keys['ArrowLeft']  = mx < W / 2;
-    keys['ArrowRight'] = mx >= W / 2;
+  if (state === 'playing') {
+    updateMoveKeys(t.clientX);
     return;
   }
 
-  const stage = getClickedStage(mx, my);
+  // canvas 座標に変換してマップ判定
+  const { gx, gy } = clientToGame(t.clientX, t.clientY);
+  const stage = getClickedStage(gx, gy);
 
-  if(stage >= 0){
-    // インデックス7（N-1）は心臓星 → お祝いアニメーションを表示
-    if(stage === 7){
-      showCelebration();
-      return;
-    }
+  if (stage >= 0) {
+    if (stage === 7) { showCelebration(); return; }
     startFromMap(stage);
     return;
   }
 
-  // スタート画面・ミッションクリア画面・全クリア画面・ゲームオーバー画面では星以外のタッチを無視
-  // ゲームオーバー時は「再挑戦する」ボタンのみ有効
-  if(state === 'start' || state === 'stage_clear' || state === 'all_clear' || state === 'over') return;
+  if (state === 'start' || state === 'stage_clear' || state === 'all_clear' || state === 'over') return;
 
   handleStart();
-},{passive:false});
+}, { passive: false });
 
 // =========================
-// タッチ移動（変更なし）
+// タッチ移動（黒帯対応）
 // =========================
-cv.addEventListener('touchmove',e=>{
+document.addEventListener('touchmove', (e) => {
+  const tag = e.target.tagName;
+  if (tag === 'BUTTON' || tag === 'A' || tag === 'INPUT') return;
+
+  const onGame = e.target === cv ||
+                 e.target.id === 'rw' ||
+                 e.target.id === 'rwrap' ||
+                 e.target === document.body ||
+                 e.target === document.documentElement;
+  if (!onGame) return;
+
   e.preventDefault();
-  if(!e.touches[0]) return;
-  if(state === 'launch_anim') return;
+  if (!e.touches[0]) return;
+  if (state === 'launch_anim') return;
 
-  const rect=cv.getBoundingClientRect();
-  const rx=(e.touches[0].clientX-rect.left)/rect.width*W;
-
-  keys['ArrowLeft']=rx<W/2;
-  keys['ArrowRight']=rx>=W/2;
-},{passive:false});
+  updateMoveKeys(e.touches[0].clientX);
+}, { passive: false });
 
 // =========================
-// タッチ終了（変更なし）
+// タッチ終了（黒帯対応）
 // =========================
-cv.addEventListener('touchend',e=>{
+document.addEventListener('touchend', (e) => {
+  const tag = e.target.tagName;
+  if (tag === 'BUTTON' || tag === 'A' || tag === 'INPUT') return;
+
+  const onGame = e.target === cv ||
+                 e.target.id === 'rw' ||
+                 e.target.id === 'rwrap' ||
+                 e.target === document.body ||
+                 e.target === document.documentElement;
+  if (!onGame) return;
+
   e.preventDefault();
-  if(state === 'launch_anim') return;
-  keys['ArrowLeft']=false;
-  keys['ArrowRight']=false;
-},{passive:false});
+  if (state === 'launch_anim') return;
+  keys['ArrowLeft']  = false;
+  keys['ArrowRight'] = false;
+}, { passive: false });
+
 
 // =========================
 // クリック（修正版）

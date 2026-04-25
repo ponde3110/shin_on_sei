@@ -1337,8 +1337,8 @@ function drawBlackhole(bh) {
 
   ctx.save();
 
-  // 1. 引力歪みライン（光の筋）
-  const WLINES = 24;
+  // 1. 引力歪みライン（光の筋）削減：24本→8本
+  const WLINES = 8;
   for(let i = 0; i < WLINES; i++){
     const ang = (i / WLINES) * Math.PI * 2 + t * 0.15 + no * 0.01;
     const wobble = 0.04 * Math.sin(i * 1.9 + t * 3.5 + no);
@@ -1802,30 +1802,11 @@ function drawStars(){
     ctx.save();
     ctx.globalAlpha = s.a;
 
-    if(s.r >= 1.0){
-      // 大きめの星：グロー＋シャープな中心点
-      const glow = ctx.createRadialGradient(s.x, sy, 0, s.x, sy, s.r * 2.8);
-      glow.addColorStop(0,   s.color.replace('rgb(', 'rgba(').replace(')', `,${s.a})`));
-      glow.addColorStop(0.35,s.color.replace('rgb(', 'rgba(').replace(')', `,${s.a * 0.55})`));
-      glow.addColorStop(1,   s.color.replace('rgb(', 'rgba(').replace(')', ',0)'));
-      ctx.globalAlpha = s.a * 0.7;
-      ctx.fillStyle = glow;
-      ctx.beginPath();
-      ctx.arc(s.x, sy, s.r * 2.8, 0, Math.PI * 2);
-      ctx.fill();
-      // シャープな中心点
-      ctx.globalAlpha = s.a;
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(s.x, sy, Math.max(0.5, s.r * 0.55), 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      // 小さい星：1pxのシャープな点
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(s.x, sy, Math.max(0.5, s.r), 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // すべての星をシンプルな点として描画（グロー廃止・軽量化）
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(s.x, sy, Math.max(0.5, s.r * 0.6), 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   }
   ctx.globalAlpha = 1;
@@ -4094,9 +4075,8 @@ if(state==='launch_anim'){
     if(right) rocketVX+=thrust*dt;
     // 左右移動時のエネルギー消費
     if(left||right) energy=Math.max(0, energy-ENERGY_MOVE_COST*dt);
-    // スラスタータイマー更新・音
+    // スラスタータイマー更新（音・炎は削除済み）
     if(_thrusterSoundTimer > 0) _thrusterSoundTimer -= dt;
-    if((left||right) && _thrusterSoundTimer <= 0) playThrusterSE();
 
     // ブラックホールが近くにある場合は減衰を弱める（rocketVXへの寄与を残すため）
     let bhNearFactor = 0;
@@ -4120,10 +4100,6 @@ if(state==='launch_anim'){
     // 傾き強化：最大±35度、追従速度アップ
     const targetTilt=(rocketVX/260)*0.62;
     rocketTilt+=(targetTilt-rocketTilt)*Math.min(1,dt*9);
-
-    // スラスター炎パーティクル
-    if(left&&Math.random()<0.65)  addThrusterFlame(rocketX,H-90, 1);
-    if(right&&Math.random()<0.65) addThrusterFlame(rocketX,H-90,-1);
 
     if(hitFlash>0)    hitFlash-=dt;
     if(pickupFlash>0) pickupFlash-=dt;

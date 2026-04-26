@@ -1445,7 +1445,7 @@ let explosionPlayed = false;  // 効果音再生フラグ
 
 // 大破爆発音（MP3版）
 function playExplosionSE() {
-  _playSE('seExplosionEl', 0.7);
+  _playSE('seExplosionEl', 0.4);
 }
 
 // 爆発パーティクルを生成
@@ -3533,7 +3533,7 @@ function drawAstronaut(a){
   const sc = (a.captureScale !== undefined && a.captureScale < 1) ? a.captureScale : 1;
   if(sc < 1) ctx.scale(sc, sc);
 
-  // ！マーク（捕獲中は非表示）
+  // SOS マーク（捕獲中は非表示）
   if(a.mode !== 'being_pulled'){
     const blink = Math.sin(Date.now() * 0.004) > 0;
     if(blink){
@@ -3541,9 +3541,9 @@ function drawAstronaut(a){
       ctx.shadowBlur = 10;
       ctx.shadowColor = '#0f0';
       ctx.fillStyle = '#aaffaa';
-      ctx.font = "bold 16px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
+      ctx.font = "bold 11px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
       ctx.textAlign = 'center';
-      ctx.fillText('！', 0, -45);
+      ctx.fillText('SOS', 0, -45);
       ctx.restore();
     }
   }
@@ -4546,6 +4546,7 @@ function startStage(idx){
   currentBlock = null;
   _uiTime = 0;
   rocketX=W/2; rocketVX=0; rocketTilt=0; speed=FIXED_SPEED; dist=0;
+  keys={}; // タッチ入力の残りをリセット
   debris=[]; items=[]; particles=[]; ufos=[]; astronauts=[]; blackholes=[]; suckingObjects=[];
   blackholeUsed=false;
   heartSetActive=false; heartSetClearTimer=0; lastMissedAnswer=null; hintDismissed=false; heartSpawnCount=0; hudProgress=0; hudTarget=0; playingTime=0;
@@ -4988,7 +4989,7 @@ function buildJourneyTrail() {
 
 // ファンファーレ（MP3版）
 function playFanfare() {
-  _playSE('seFanfareEl', 0.9);
+  _playSE('seFanfareEl', 0.5);
 }
 
 // 豪華紙吹雪

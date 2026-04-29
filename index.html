@@ -741,6 +741,7 @@ const alienImg     = new Image(); alienImg.src     = 'alien.webp';
 const blackholeImg = new Image(); blackholeImg.src = 'blackhole.webp';
 const halleyImg    = new Image(); halleyImg.src    = 'halley.webp';
 const energyImg    = new Image(); energyImg.src    = 'energy.webp';
+const _meisterIconImg = new Image(); _meisterIconImg.src = 'meister.webp';
 
 // 円形に切り抜いたオフスクリーンCanvas（通常惑星用）
 function makeRoundImg(img, diameter) {
@@ -1237,15 +1238,16 @@ function buildStarCaches(bgHue, stageId) {
 
       if (isSecretMission) {
         // ===== 裏ミッション8：帰還テーマ ── 「地球へ戻る復路」を表現 =====
+        // タイルシームレス化：上端・下端付近を避け、中間にblob配置
         // 暖色系の星雲が後方（上側）に広がり、青い地球の光が前方（下側）を照らすイメージ
         const nebulaBlobs = [
-          { x: W*0.22, y: TH*0.08, r: W*0.60, hue:  10, a: 0.065 }, // 赤橙（出発した心臓星側）
-          { x: W*0.78, y: TH*0.18, r: W*0.52, hue:  35, a: 0.055 }, // オレンジ（後方）
-          { x: W*0.55, y: TH*0.32, r: W*0.50, hue:  20, a: 0.045 }, // 赤茶
-          { x: W*0.15, y: TH*0.55, r: W*0.48, hue: 200, a: 0.055 }, // 青（地球方向が近づく）
-          { x: W*0.70, y: TH*0.68, r: W*0.58, hue: 215, a: 0.060 }, // 水色（地球方向）
-          { x: W*0.40, y: TH*0.84, r: W*0.65, hue: 210, a: 0.070 }, // 青白（到達直前）
-          { x: W*0.80, y: TH*0.95, r: W*0.50, hue: 200, a: 0.065 }, // 地球の青
+          { x: W*0.22, y: TH*0.15, r: W*0.60, hue:  10, a: 0.065 }, // 赤橙（出発した心臓星側）
+          { x: W*0.78, y: TH*0.25, r: W*0.52, hue:  35, a: 0.055 }, // オレンジ（後方）
+          { x: W*0.55, y: TH*0.38, r: W*0.50, hue:  20, a: 0.045 }, // 赤茶
+          { x: W*0.15, y: TH*0.50, r: W*0.48, hue: 200, a: 0.055 }, // 青（地球方向が近づく）
+          { x: W*0.70, y: TH*0.62, r: W*0.58, hue: 215, a: 0.060 }, // 水色（地球方向）
+          { x: W*0.40, y: TH*0.75, r: W*0.65, hue: 210, a: 0.070 }, // 青白（到達直前）
+          { x: W*0.80, y: TH*0.87, r: W*0.50, hue: 200, a: 0.065 }, // 地球の青
         ];
         c.save(); c.globalCompositeOperation = 'screen';
         for (const bl of nebulaBlobs) {
@@ -1257,7 +1259,7 @@ function buildStarCaches(bgHue, stageId) {
           c.beginPath(); c.arc(bl.x, bl.y, bl.r, 0, Math.PI*2); c.fill();
         }
         // 帰還を示す赤い散光星雲（後方に大きく）
-        { const hx=W*0.50, hy=TH*0.22;
+        { const hx=W*0.50, hy=TH*0.28;
           c.save(); c.globalCompositeOperation='screen';
           const hg=c.createRadialGradient(hx,hy,0,hx,hy,70);
           hg.addColorStop(0,  'rgba(240,60,50,0.22)');
@@ -1268,7 +1270,7 @@ function buildStarCaches(bgHue, stageId) {
           c.restore(); c.restore();
         }
         // 青白い地球方向の光（前方・大きく鮮明に）
-        { const ex=W*0.50, ey=TH*0.78;
+        { const ex=W*0.50, ey=TH*0.72;
           c.save(); c.globalCompositeOperation='screen';
           const eg=c.createRadialGradient(ex,ey,0,ex,ey,100);
           eg.addColorStop(0,  'rgba(120,220,255,0.32)');
@@ -1278,13 +1280,13 @@ function buildStarCaches(bgHue, stageId) {
           c.fillStyle=eg; c.beginPath(); c.arc(ex,ey,100,0,Math.PI*2); c.fill();
           c.restore();
         }
-        // 地球の光の筋（縦方向のグラデーション）－下方向に向かって青くなる感じ
+        // 地球の光の筋（縦方向のグラデーション）－下方向に向かって青くなる感じ（中央から下半分のみ）
         { c.save(); c.globalCompositeOperation='screen';
-          const lg=c.createLinearGradient(0, TH*0.5, 0, TH*1.0);
+          const lg=c.createLinearGradient(0, TH*0.45, 0, TH*0.95);
           lg.addColorStop(0,   'rgba(0,0,0,0)');
           lg.addColorStop(0.5, 'rgba(40,100,200,0.04)');
           lg.addColorStop(1,   'rgba(80,180,255,0.09)');
-          c.fillStyle=lg; c.fillRect(0, TH*0.5, W, TH*0.5);
+          c.fillStyle=lg; c.fillRect(0, TH*0.45, W, TH*0.5);
           c.restore();
         }
         c.restore();
@@ -1544,6 +1546,7 @@ let halleyTimer = 8 + Math.random() * 7; // 60〜120秒に1回（稀）
 let halleys = []; // ゲームオブジェクトとしてのハレー彗星配列
 
 let state='start';
+let _resetBtnRect = null; // スタート画面のリセットボタン座標
 let life=LIFE_MAX; // 後方互換のため残す（内部的にはenergyを使用）
 let energy=ENERGY_MAX; // エネルギー（0になるとゲームオーバー）
 let keys={},lastTime=0;
@@ -1754,15 +1757,18 @@ function drawBlackhole(bh) {
 
   // 2. blackhole.webp 描画
   if(blackholeImg.complete && blackholeImg.naturalWidth > 0){
-    // ── 中央の黒い部分をぼかした下地で作る（ラジアルグラデーション）──
-    const coreGrad = ctx.createRadialGradient(cx, cy, r * 0.35, cx, cy, r * 0.85);
-    coreGrad.addColorStop(0,   'rgba(0,0,0,1)');
-    coreGrad.addColorStop(0.55,'rgba(0,0,0,0.95)');
-    coreGrad.addColorStop(0.85,'rgba(0,0,0,0.6)');
-    coreGrad.addColorStop(1,   'rgba(0,0,0,0)');
+    // ── 中央の黒い部分をぼかした下地で作る（辺縁を非常にぼんやりさせたラジアルグラデーション）──
+    const coreGrad = ctx.createRadialGradient(cx, cy, r * 0.05, cx, cy, r * 1.6);
+    coreGrad.addColorStop(0.0,  'rgba(0,0,0,1)');
+    coreGrad.addColorStop(0.25, 'rgba(0,0,0,0.95)');
+    coreGrad.addColorStop(0.45, 'rgba(0,0,0,0.75)');
+    coreGrad.addColorStop(0.60, 'rgba(0,0,0,0.45)');
+    coreGrad.addColorStop(0.75, 'rgba(0,0,0,0.20)');
+    coreGrad.addColorStop(0.88, 'rgba(0,0,0,0.07)');
+    coreGrad.addColorStop(1.0,  'rgba(0,0,0,0)');
     ctx.fillStyle = coreGrad;
     ctx.beginPath();
-    ctx.arc(cx, cy, r * 0.88, 0, Math.PI * 2);
+    ctx.arc(cx, cy, r * 1.5, 0, Math.PI * 2);
     ctx.fill();
 
     // ── その上に画像をスクリーン合成で重ねる ──
@@ -3028,6 +3034,42 @@ function drawStartScreen() {
   }
   ctx.restore();
 
+  // --- マイスター勲章（左上・secretCleared時のみ表示）---
+  if(secretCleared){
+    const meisterImg2 = new Image();
+    // meisterImgはglobal化されていないので直接drawImageを試みる
+    // meister.webpを参照するためのキャッシュ変数を使用
+    if(typeof _meisterIconImg !== 'undefined' && _meisterIconImg.complete && _meisterIconImg.naturalWidth > 0){
+      const mSize = 34;
+      const mX = 8, mY = 8;
+      ctx.save();
+      ctx.shadowColor = 'rgba(255,200,0,0.8)';
+      ctx.shadowBlur = 10 + 5*Math.sin(T*2.0);
+      ctx.globalAlpha = 0.92;
+      ctx.drawImage(_meisterIconImg, mX, mY, mSize, mSize);
+      ctx.restore();
+    }
+  }
+
+  // --- リセットボタン（右上）---
+  {
+    const rbW = 90, rbH = 18, rbX = W - rbW - 6, rbY = 6;
+    ctx.save();
+    ctx.fillStyle = 'rgba(80,40,40,0.75)';
+    ctx.beginPath(); ctx.roundRect(rbX, rbY, rbW, rbH, 5); ctx.fill();
+    ctx.strokeStyle = 'rgba(200,100,100,0.5)'; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.roundRect(rbX, rbY, rbW, rbH, 5); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,160,140,0.92)';
+    ctx.font = "bold 8px -apple-system, 'Hiragino Sans', sans-serif";
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🗑 記録をリセット', rbX + rbW/2, rbY + rbH/2);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+    // ヒットエリアをグローバルに保存（クリック判定用）
+    _resetBtnRect = { x: rbX, y: rbY, w: rbW, h: rbH };
+  }
+
   // --- 流れ星パーティクル（UI専用、簡易） ---
   ctx.save();
   for(let i = 0; i < 4; i++){
@@ -4093,11 +4135,7 @@ function checkCollisions(){
         d.vx = -d.vx * 1.4 + (Math.random()-0.5)*1.5;
         d.vy = -Math.abs(d.vy) * 1.4 - 1.0; // 必ず上方向へ
         d.rotV = (Math.random()-0.5) * 0.15;
-        // rocket3（secretCleared）は隕石ヒットでもエネルギー消費しない
-        if(!secretCleared){
-          energy = Math.max(0, energy - ENERGY_HIT_COST);
-          life = Math.round(energy/ENERGY_MAX*LIFE_MAX);
-        }
+        // 裏ミッション（isSecret）またはsecretClearedの場合はエネルギー消費なし
         hitFlash = 0.5;
         playBounceHitSE();
         shakeX=(Math.random()-0.5)*8; shakeY=(Math.random()-0.5)*6;
@@ -4519,7 +4557,13 @@ if(state==='launch_anim'){
   }
 
   if(state==='arrive_anim'){
-    if(arriveT === 0 && dt > 0){ stopAllSounds(); setTimeout(()=>playArriveSound(), 80); }
+    if(arriveT === 0 && dt > 0){
+      stopAllSounds();
+      setTimeout(()=>playArriveSound(), 80);
+      arriveT = 0.0001; // 次フレームで再実行しないよう微小値を設定
+    } else if(arriveT === 0 && dt === 0){
+      // dt=0の場合はそのまま
+    }
     arriveT=Math.min(1,arriveT+dt/ARRIVE_DUR);
     starScroll+=dt*20;
     particles=particles.filter(p=>p.life>0);
@@ -5045,7 +5089,15 @@ function checkEnergyOrbPickup() {
       energy = ENERGY_MAX;
       life   = LIFE_MAX;
       pickupFlash = 0.7;
-      _playSE('seEnergyPickupEl', 0.35);
+      // エネルギーボール取得音（複数の方法で確実に再生）
+      _playSE('seEnergyPickupEl', 0.7);
+      // フォールバック：正解音も同時に鳴らす（pickup音がない場合の保険）
+      try {
+        const pickupEl = document.getElementById('seEnergyPickupEl');
+        if(!pickupEl || pickupEl.readyState === 0){
+          _playSE('seCorrectEl', 0.5);
+        }
+      } catch(e2) {}
     }
   }
 }
@@ -5252,6 +5304,24 @@ cv.addEventListener('touchstart', (e) => {
 
   const stage = getClickedStage(mx, my);
 
+  // スタート画面のリセットボタン判定（タッチ）
+  if(state === 'start' && _resetBtnRect){
+    const rb = _resetBtnRect;
+    if(mx >= rb.x && mx <= rb.x+rb.w && my >= rb.y && my <= rb.y+rb.h){
+      if(confirm('すべての記録（クリア済みミッション・マイスター勲章）をリセットしますか？')){
+        try {
+          localStorage.removeItem('shinon_completedCount');
+          localStorage.removeItem('shinon_secretCleared');
+        } catch(e2){}
+        completedCount = 0;
+        secretCleared = false;
+        stageIdx = 0;
+        updateBtn();
+      }
+      return;
+    }
+  }
+
   if(stage >= 0){
     // インデックス7（N-1）は心臓星 → お祝いアニメーションを表示
     if(stage === 7){
@@ -5308,6 +5378,24 @@ cv.addEventListener('click', (e) => {
   const rect = cv.getBoundingClientRect();
   const mx = (e.clientX - rect.left) * (W / rect.width);
   const my = (e.clientY - rect.top) * (H / rect.height);
+
+  // スタート画面のリセットボタン判定
+  if(state === 'start' && _resetBtnRect){
+    const rb = _resetBtnRect;
+    if(mx >= rb.x && mx <= rb.x+rb.w && my >= rb.y && my <= rb.y+rb.h){
+      if(confirm('すべての記録（クリア済みミッション・マイスター勲章）をリセットしますか？')){
+        try {
+          localStorage.removeItem('shinon_completedCount');
+          localStorage.removeItem('shinon_secretCleared');
+        } catch(e2){}
+        completedCount = 0;
+        secretCleared = false;
+        stageIdx = 0;
+        updateBtn();
+      }
+      return;
+    }
+  }
 
   // 航路マップ上のステージアイコンが押されたか判定
   const stage = getClickedStage(mx, my);
@@ -5804,13 +5892,13 @@ function _showCelebrationImpl(isSecretClear, withFanfare) {
     }
   }
 
-  // タイムライン：裏ミッションクリアは金・銀紙吹雪
+  // タイムライン：通常クリア（ミッション7）は金・銀紙吹雪、裏ミッション（ミッション8）は豪華カラー紙吹雪
   if(isSecretClear){
-    setTimeout(()=>spawnConfettiGoldSilver(100), 3900);
-    setTimeout(()=>spawnConfettiGoldSilver(60),  4700);
-  } else {
     setTimeout(()=>spawnConfetti(100), 3900);
     setTimeout(()=>spawnConfetti(60),  4700);
+  } else {
+    setTimeout(()=>spawnConfettiGoldSilver(100), 3900);
+    setTimeout(()=>spawnConfettiGoldSilver(60),  4700);
   }
   setTimeout(()=>spawnSparkles(20),  4000);
   setTimeout(()=>spawnSparkles(14),  5200);
@@ -6201,7 +6289,7 @@ document.getElementById('secretMissionBtn').addEventListener('click', (e) => {
         gc.font = "bold 13px -apple-system,'Hiragino Sans',sans-serif";
         gc.shadowColor = 'rgba(120,200,255,0.9)'; gc.shadowBlur = 12;
         gc.fillStyle = 'rgba(200,235,255,0.95)';
-        gc.fillText('✦ 中... ✦', cx, cy + RY - 30);
+        gc.fillText('✦ 進化中... ✦', cx, cy + RY - 30);
       }
       // 「GOLDEN ROCKET」- 金色ロケット表示中（t=0.74〜0.97）に表示（長めに）
       if (t >= 0.74 && t < 0.97) {

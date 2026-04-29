@@ -1548,6 +1548,7 @@ let halleys = []; // ゲームオブジェクトとしてのハレー彗星配�
 
 let state='start';
 let _resetBtnRect = null;
+let _resetBtnHover = false; // リセットボタンのホバー状態
 const _meisterIconImg = new Image(); _meisterIconImg.src = 'meister.webp';
 let life=LIFE_MAX; // 後方互換のため残す（内部的にはenergyを使用）
 let energy=ENERGY_MAX; // エネルギー（0になるとゲームオーバー）
@@ -1759,28 +1760,27 @@ function drawBlackhole(bh) {
 
   // 2. blackhole.webp 描画
   if(blackholeImg.complete && blackholeImg.naturalWidth > 0){
-    // ── 中央の黒い部分をぼかした下地で作る（ラジアルグラデーション）──
-    const coreGrad = ctx.createRadialGradient(cx, cy, r * 0.15, cx, cy, r * 1.2);
-　　coreGrad.addColorStop(0.0,  'rgba(0,0,0,1)');
-　　coreGrad.addColorStop(0.4,  'rgba(0,0,0,0.9)');
-　　coreGrad.addColorStop(0.7,  'rgba(0,0,0,0.5)');
-　　coreGrad.addColorStop(0.9,  'rgba(0,0,0,0.15)');
-　　coreGrad.addColorStop(1.0,  'rgba(0,0,0,0)');
-    ctx.fillStyle = coreGrad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * 0.88, 0, Math.PI * 2);
-    ctx.fill();
-
-    // ── その上に画像をスクリーン合成で重ねる ──
+    // ── まずブラックホール画像を描画 ──
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(bh.rot);
-    
-    // スクリーン合成にすることで、画像の黒いリム（外枠）だけが消える
     ctx.globalCompositeOperation = 'screen';
-    
     const drawR = r * 2.4; 
     ctx.drawImage(blackholeImg, -drawR, -drawR, drawR * 2, drawR * 2);
+    ctx.restore();
+
+    // ── 画像の透明（穴）部分を覆う黒い円（画像より大きめに）──
+    // blackhole.webpの中央透明部分のサイズに合わせて調整
+    ctx.save();
+    const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.05);
+    coreGrad.addColorStop(0.0,  'rgba(0,0,0,1)');
+    coreGrad.addColorStop(0.75, 'rgba(0,0,0,1)');
+    coreGrad.addColorStop(0.88, 'rgba(0,0,0,0.7)');
+    coreGrad.addColorStop(1.0,  'rgba(0,0,0,0)');
+    ctx.fillStyle = coreGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 1.05, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   } else {
     ctx.fillStyle = '#000';
@@ -3035,62 +3035,83 @@ function drawStartScreen() {
   }
   ctx.restore();
 
-  // ── 左上：マイスター獲得 ／ 右上：記録をリセット（高さを揃えて整列）──
+  // ── 右上：記録をリセット（テキストのみ・クリック可能）──
+  // ── 左上：マイスター取得（secretCleared時のみ）／ 右上：記録をリセット ──
   {
-    const MARGIN  = 7;   // 画面端マージン
-    const BLOCK_W = 54;  // 各ブロックの幅
-    const LABEL_Y = 12;  // ラベル baseline（画面上端から）
-    const ICON_Y  = 17;  // アイコン描画上端Y
-    const ICON_H  = 32;  // アイコン高さ上限
+    const MARGIN  = 7;
+    const LABEL_Y = 12; // ボタン中心Y
 
     ctx.save();
+    ctx.shadowBlur = 0;
 
-    // ── 左上：マイスター取得（secretCleared時のみ）──
+    // ── 左上：マイスター取得（secretCleared時のみ・文字のみボタン風）──
     if(secretCleared){
-      const lx = MARGIN;
-      // ラベル
+      const label = 'マイスター取得';
       ctx.font = "bold 7.5px -apple-system,'Hiragino Sans','Yu Gothic UI',sans-serif";
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.shadowColor = 'rgba(255,200,0,0.8)';
-      ctx.shadowBlur  = 5;
-      ctx.fillStyle   = 'rgba(255,220,100,0.95)';
-      ctx.fillText('マイスター取得', lx, LABEL_Y);
+      const tw = ctx.measureText(label).width;
+      const BTN_PAD_X = 5, BTN_PAD_Y = 3;
+      const btnW = tw + BTN_PAD_X * 2;
+      const btnH = 12 + BTN_PAD_Y * 2;
+      const btnX = MARGIN;
+      const btnY = LABEL_Y - btnH / 2;
+      // 背景
+      ctx.save();
+      ctx.globalAlpha = 0.75;
+      ctx.fillStyle = 'rgba(40,28,0,0.7)';
+      ctx.beginPath(); ctx.roundRect(btnX, btnY, btnW, btnH, 4); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,200,0,0.40)';
+      ctx.lineWidth = 0.7;
+      ctx.beginPath(); ctx.roundRect(btnX, btnY, btnW, btnH, 4); ctx.stroke();
+      ctx.restore();
+      // テキスト
+      ctx.shadowColor = 'rgba(255,200,0,0.7)';
+      ctx.shadowBlur  = 4;
+      ctx.fillStyle   = 'rgba(255,220,100,0.92)';
+      ctx.fillText(label, MARGIN + BTN_PAD_X, LABEL_Y);
       ctx.shadowBlur  = 0;
-      // 勲章画像（縦横比を維持して収める）
-      if(_meisterIconImg && _meisterIconImg.complete && _meisterIconImg.naturalWidth > 0){
-        const iw = _meisterIconImg.naturalWidth, ih = _meisterIconImg.naturalHeight;
-        const scale = Math.min(BLOCK_W / iw, ICON_H / ih);
-        const dw = Math.round(iw * scale), dh = Math.round(ih * scale);
-        ctx.save();
-        ctx.shadowColor = 'rgba(255,200,0,0.6)';
-        ctx.shadowBlur  = 7 + 3*Math.sin(T*2.0);
-        ctx.globalAlpha = 0.95;
-        ctx.drawImage(_meisterIconImg, lx, ICON_Y, dw, dh);
-        ctx.restore();
-      }
     }
 
-    // ── 右上：記録をリセット ──
+    // ── 右上：記録をリセット（控えめボタン・ホバーで変化）──
     {
-      const rx = W - MARGIN - BLOCK_W;  // アイコン左端
-      // ラベル
+      const label = '記録をリセット';
       ctx.font = "bold 7.5px -apple-system,'Hiragino Sans','Yu Gothic UI',sans-serif";
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
-      ctx.shadowBlur  = 0;
-      ctx.fillStyle   = 'rgba(255,150,130,0.88)';
-      ctx.fillText('記録をリセット', W - MARGIN, LABEL_Y);
-      // ゴミ箱絵文字
-      const iconSz = Math.round(ICON_H * 0.85);
-      ctx.font = `${iconSz}px -apple-system,sans-serif`;
-      ctx.textAlign  = 'center';
-      ctx.textBaseline = 'top';
-      ctx.globalAlpha = 0.85;
-      ctx.fillText('🗑️', rx + BLOCK_W / 2, ICON_Y);
-      ctx.globalAlpha = 1.0;
-      // ヒット領域を保存（ラベル＋アイコン全体をカバー）
-      _resetBtnRect = { x: rx - 4, y: 0, w: BLOCK_W + MARGIN + 8, h: ICON_Y + ICON_H + 6 };
+      const tw = ctx.measureText(label).width;
+      const BTN_PAD_X = 5, BTN_PAD_Y = 3;
+      const btnW = tw + BTN_PAD_X * 2;
+      const btnH = 12 + BTN_PAD_Y * 2;
+      const btnX = W - MARGIN - btnW;
+      const btnY = LABEL_Y - btnH / 2;
+
+      const hov = _resetBtnHover;
+
+      // 背景（ホバー時は少し明るく）
+      ctx.save();
+      ctx.globalAlpha = hov ? 0.95 : 0.78;
+      ctx.fillStyle = hov ? 'rgba(90,15,10,0.85)' : 'rgba(60,10,10,0.7)';
+      ctx.beginPath(); ctx.roundRect(btnX, btnY, btnW, btnH, 4); ctx.fill();
+      ctx.strokeStyle = hov ? 'rgba(255,140,120,0.80)' : 'rgba(255,120,100,0.42)';
+      ctx.lineWidth = hov ? 0.9 : 0.7;
+      ctx.beginPath(); ctx.roundRect(btnX, btnY, btnW, btnH, 4); ctx.stroke();
+      // ホバー時は内側グロー
+      if(hov){
+        const ig = ctx.createLinearGradient(btnX, btnY, btnX, btnY+btnH);
+        ig.addColorStop(0, 'rgba(255,80,60,0.14)');
+        ig.addColorStop(1, 'rgba(255,30,10,0.04)');
+        ctx.fillStyle = ig;
+        ctx.beginPath(); ctx.roundRect(btnX, btnY, btnW, btnH, 4); ctx.fill();
+      }
+      ctx.restore();
+
+      // テキスト（ホバー時は明るく）
+      ctx.fillStyle = hov ? 'rgba(255,180,165,1.0)' : 'rgba(255,150,130,0.88)';
+      ctx.fillText(label, W - MARGIN - BTN_PAD_X, LABEL_Y);
+
+      // ヒット領域
+      _resetBtnRect = { x: btnX - 2, y: btnY - 2, w: btnW + 4, h: btnH + 4 };
     }
 
     ctx.restore();
@@ -3544,9 +3565,8 @@ function drawArriveAnim(){
   // 3. テキスト表示
   if(t > 0.3){
     const a = Math.min(1, (t - 0.3) * 3);
-    // 最終ミッション（心臓星）は明るいシアン、それ以外は白
-    const isFinal = s.arriveText && s.arriveText.includes('心臓星');
-    ctx.fillStyle = isFinal ? `rgba(0,255,220,${a})` : `rgba(255,255,255,${a})`;
+    // 最終ミッション（心臓星）も含めて白で統一
+    ctx.fillStyle = `rgba(255,255,255,${a})`;
     ctx.font = "bold 20px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
     ctx.textAlign = 'center';
     ctx.fillText(s.arriveText, W/2, H * 0.45);
@@ -4164,19 +4184,24 @@ function checkCollisions(){
     if(hit){
       // 裏ミッション(isSecret)またはsecretCleared（rocket3使用）：隕石を跳ね返す・エネルギー消費なし・爆発しない
       if(st().isSecret || secretCleared){
-        // 跳ね返し：隕石の速度を反転させて跳ね飛ばす
-        d.vx = -d.vx * 1.4 + (Math.random()-0.5)*1.5;
-        d.vy = -Math.abs(d.vy) * 1.4 - 1.0; // 必ず上方向へ
-        d.rotV = (Math.random()-0.5) * 0.15;
+        // 跳ね返し：隕石同士の衝突と同様に軌跡を少し変えるだけ
+        const rx2 = rocketX, ry2 = H - 90;
+        const dx2 = d.x - rx2, dy2 = d.y - ry2;
+        const dist2 = Math.sqrt(dx2*dx2 + dy2*dy2) || 1;
+        const nx2 = dx2/dist2, ny2 = dy2/dist2;
+        const impulse = 0.6 + Math.random()*0.3;
+        d.vx += nx2 * impulse;
+        d.vy += ny2 * impulse;
+        d.rotV = (Math.random()-0.5) * 0.06;
         // rocket3（secretCleared）は隕石ヒットでもエネルギー消費しない
         if(!secretCleared){
           energy = Math.max(0, energy - ENERGY_HIT_COST);
           life = Math.round(energy/ENERGY_MAX*LIFE_MAX);
         }
-        hitFlash = 0.5;
+        hitFlash = 0.3;
         playBounceHitSE();
-        shakeX=(Math.random()-0.5)*8; shakeY=(Math.random()-0.5)*6;
-        setTimeout(()=>{shakeX=0;shakeY=0;},150);
+        shakeX=(Math.random()-0.5)*4; shakeY=(Math.random()-0.5)*3;
+        setTimeout(()=>{shakeX=0;shakeY=0;},80);
       } else {
         d.alive=false; energy=Math.max(0,energy-ENERGY_HIT_COST); life=Math.round(energy/ENERGY_MAX*LIFE_MAX); hitFlash=0.5;
         addMeteorDebris(d.x, d.y, d.r);
@@ -4887,7 +4912,7 @@ function spawnSecretPlanet(img, isSaturn) {
     isSaturn,
     x,
     y: -40,
-    vy: 0.35 + Math.random() * 0.2, // ゆっくり落下（元より遅く）
+    vy: 0.20 + Math.random() * 0.12, // 速度をさらに遅く
     size: 62 + Math.random() * 18,  // 現在の約2倍のサイズ
     alpha: 0,
     life: 1.0,
@@ -4922,12 +4947,13 @@ function updateSecretScrollPlanets(dt) {
       p.alpha = Math.min(1, p.alpha + dt * 2.5);
       if (p.alpha >= 1) p.phase = 'scroll';
     }
-    // 画面下端でフェードアウト
-    if (p.y > H - 60 && p.phase === 'scroll') {
+    // 画面下端を超えたらフェードアウト開始（完全に画面外まで待つ）
+    const planetH = p.isSaturn ? p.size * 1.2 : p.size;
+    if (p.y - planetH/2 > H && p.phase === 'scroll') {
       p.phase = 'out';
     }
     if (p.phase === 'out') {
-      p.alpha = Math.max(0, p.alpha - dt * 3.0);
+      p.alpha = Math.max(0, p.alpha - dt * 4.0);
     }
     if (p.alpha <= 0 && p.phase === 'out') {
       secretScrollPlanets.splice(i, 1);
@@ -5270,12 +5296,27 @@ cv.addEventListener('mousemove', (e) => {
   if(isAnim() || state==='playing'){
     cv.style.cursor='default';
     mapHoveredStar=-1;
+    _resetBtnHover = false;
     return;
   }
 
   const rect = cv.getBoundingClientRect();
   const mx = (e.clientX - rect.left) * (W / rect.width);
   const my = (e.clientY - rect.top) * (H / rect.height);
+
+  // リセットボタンのホバー判定（スタート画面のみ）
+  if(state === 'start' && _resetBtnRect){
+    const rb = _resetBtnRect;
+    const onReset = mx >= rb.x && mx <= rb.x + rb.w && my >= rb.y && my <= rb.y + rb.h;
+    _resetBtnHover = onReset;
+    if(onReset){
+      cv.style.cursor = 'pointer';
+      mapHoveredStar = -1;
+      return;
+    }
+  } else {
+    _resetBtnHover = false;
+  }
 
   const stage = getClickedStage(mx, my);
 
@@ -5345,6 +5386,9 @@ cv.addEventListener('touchstart', (e) => {
   if(state === 'start' && _resetBtnRect && stage < 0){
     const rb = _resetBtnRect;
     if(mx >= rb.x && mx <= rb.x + rb.w && my >= rb.y && my <= rb.y + rb.h){
+      // タッチ中はホバー状態をON（一瞬光らせる）
+      _resetBtnHover = true;
+      setTimeout(() => { _resetBtnHover = false; }, 300);
       if(confirm('すべての記録（クリア済みミッション・マイスター勲章）をリセットしますか？')){
         try{ localStorage.removeItem('shinon_completedCount'); localStorage.removeItem('shinon_secretCleared'); }catch(e2){}
         completedCount = 0; secretCleared = false; stageIdx = 0; updateBtn();
@@ -5917,13 +5961,13 @@ function _showCelebrationImpl(isSecretClear, withFanfare) {
     }
   }
 
-  // タイムライン：裏ミッションクリアは金・銀紙吹雪
+  // タイムライン：裏ミッションクリアは通常カラー紙吹雪、通常クリアは金・銀紙吹雪
   if(isSecretClear){
-    setTimeout(()=>spawnConfettiGoldSilver(100), 3900);
-    setTimeout(()=>spawnConfettiGoldSilver(60),  4700);
-  } else {
     setTimeout(()=>spawnConfetti(100), 3900);
     setTimeout(()=>spawnConfetti(60),  4700);
+  } else {
+    setTimeout(()=>spawnConfettiGoldSilver(100), 3900);
+    setTimeout(()=>spawnConfettiGoldSilver(60),  4700);
   }
   setTimeout(()=>spawnSparkles(20),  4000);
   setTimeout(()=>spawnSparkles(14),  5200);

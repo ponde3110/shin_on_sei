@@ -863,7 +863,7 @@ const STAGES=[
     fromColor:'#4b70dd', toColor:'#ffffff',
   },
   {
-    id:8, goal:5000, heartCount:10, label:'裏ミッション：帰還への試練', bgHue:280, debrisSpd:3.5,
+    id:8, goal:5000, heartCount:45, label:'裏ミッション：帰還への試練', bgHue:280, debrisSpd:3.5,
     launchText:'心臓星を出発！', arriveText:'地球に帰還！',
     getFrom:()=>goalCanvas, getTo:()=>earthCanvas,
     getHudFrom:()=>hudGoalCanvas, getHudTo:()=>hudEarthCanvas,
@@ -4205,11 +4205,8 @@ function checkCollisions(){
         d.vx += nx2 * impulse;
         d.vy += ny2 * impulse;
         d.rotV = (Math.random()-0.5) * 0.06;
-        // rocket3（secretCleared）は隕石ヒットでもエネルギー消費しない
-        if(!secretCleared){
-          energy = Math.max(0, energy - ENERGY_HIT_COST);
-          life = Math.round(energy/ENERGY_MAX*LIFE_MAX);
-        }
+        // rocket2(isSecret)・rocket3（secretCleared）は隕石ヒットでもエネルギー消費しない
+        // （どちらの条件でもエネルギー消費なし）
         hitFlash = 0.3;
         playBounceHitSE();
         shakeX=(Math.random()-0.5)*4; shakeY=(Math.random()-0.5)*3;
@@ -5178,7 +5175,7 @@ function checkEnergyOrbPickup() {
       energy = ENERGY_MAX;
       life   = LIFE_MAX;
       pickupFlash = 0.7;
-      _playSE('seEnergyPickupEl', 0.6);
+      _playSE('seEnergyPickupEl', 0.35);
     }
   }
 }

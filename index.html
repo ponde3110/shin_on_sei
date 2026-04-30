@@ -1189,7 +1189,7 @@ const FIXED_SPEED=0.45;
 const LIFE_MAX=30; // 後方互換のため残す
 const ENERGY_MAX=100; // エネルギーの最大値
 const ENERGY_MOVE_COST=3; // 移動1秒あたりのエネルギー消費
-const ENERGY_HIT_COST=20;   // 隕石衝突時のエネルギー消費
+const ENERGY_HIT_COST=15;   // 隕石衝突時のエネルギー消費
 const ENERGY_MISS_COST=20;  // 正解ハートを逃した時のエネルギー消費
 const ENERGY_WRONG_COST=25; // 不正解ハート取得時のエネルギー消費
 const ENERGY_BH_COST=0;    // ブラックホール接触時のエネルギー消費
@@ -4682,7 +4682,7 @@ if(state==='launch_anim'){
     }
 
     const isM8 = st().isSecret; // ミッション8（裏ミッション）フラグ
-    const thrust= isM8 ? (520+speed*150) : (420+speed*130);
+    const thrust= isM8 ? (520+speed*150) : (490+speed*145);
     const left=keys['ArrowLeft']||keys['a']||keys['A'];
     const right=keys['ArrowRight']||keys['d']||keys['D'];
     if(left)  rocketVX-=thrust*dt;
@@ -4705,11 +4705,11 @@ if(state==='launch_anim'){
       }
     }
     // ミッション8はより機敏に（減衰を弱める）
-    const dampBase = isM8 ? ((left||right) ? 0.88 : 0.82) : ((left||right) ? 0.82 : 0.76);
+    const dampBase = isM8 ? ((left||right) ? 0.88 : 0.82) : ((left||right) ? 0.85 : 0.79);
     const dampBH   = (left||right) ? 0.92 : 0.94;
     const damp = dampBase + (dampBH - dampBase) * bhNearFactor;
     rocketVX *= damp;
-    const maxVX = isM8 ? 340 : 280;
+    const maxVX = isM8 ? 340 : 310;
     rocketVX=Math.max(-maxVX,Math.min(maxVX,rocketVX));
     rocketX=Math.max(22,Math.min(W-22,rocketX+rocketVX*dt));
 

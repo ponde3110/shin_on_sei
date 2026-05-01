@@ -347,12 +347,11 @@ html, body {
   transform: translate(-50%, -50%) scale(0);
   opacity: 0;
   animation:
-    heartGrandEntrance 1.1s cubic-bezier(0.34,1.56,0.64,1) 3.0s forwards,
-    celebHeartBeat 893ms ease-in-out 4.1s infinite;
+    meisterEntrance 1.1s cubic-bezier(0.34,1.56,0.64,1) 3.0s forwards;
   filter:
-    drop-shadow(0 0 22px rgba(255,100,160,1))
-    drop-shadow(0 0 50px rgba(255,60,120,0.7))
-    drop-shadow(0 0 80px rgba(200,40,100,0.4));
+    drop-shadow(0 0 18px rgba(255,200,60,0.9))
+    drop-shadow(0 0 40px rgba(255,160,20,0.6))
+    drop-shadow(0 0 70px rgba(220,120,0,0.3));
 }
 @keyframes celebHeartBeat {
   0%    { transform: translate(-50%, -50%) scale(1.0); }
@@ -468,7 +467,7 @@ html, body {
 
 #secretMissionBtn {
   display: block;
-  margin: 10px auto 0;
+  margin: 22px auto 0;
   padding: 10px 32px;
   font-size: 13px; font-weight: 800; color: #fff;
   background: linear-gradient(135deg, #4488ff 0%, #1144cc 50%, #002288 100%);
@@ -631,7 +630,7 @@ html, body {
     <div class="glow-ring" id="ring1"></div>
     <div class="glow-ring" id="ring2"></div>
     <div class="glow-ring" id="ring3"></div>
-    <img id="celebHeart" src="goal.webp" alt="心臓星">
+    <img id="celebHeart" src="expert.webp" alt="勲章">
     <img id="celebStetho" src="stethoscope.webp" alt="聴診器">
     <div id="mergeFlash"></div>
     <div id="mergeFlash2"></div>
@@ -741,6 +740,8 @@ const alienImg     = new Image(); alienImg.src     = 'alien.webp';
 const blackholeImg = new Image(); blackholeImg.src = 'blackhole.webp';
 const halleyImg    = new Image(); halleyImg.src    = 'halley.webp';
 const energyImg    = new Image(); energyImg.src    = 'energy.webp';
+const expertImg    = new Image(); expertImg.src    = 'expert.webp';
+const meisterImg   = new Image(); meisterImg.src   = 'meister.webp';
 
 // 円形に切り抜いたオフスクリーンCanvas（通常惑星用）
 function makeRoundImg(img, diameter) {
@@ -2112,10 +2113,19 @@ function spawnHeartSets(){
   const correctSide = shuffledLabels.indexOf(currentBlock.correct);
   const sharedY = -20;
 
+  // 両ハートのX座標を決定（最小間隔を確保）
+  const MIN_HEART_GAP = 70;
+  let heartXLeft, heartXRight;
+  let heartAttempts = 0;
+  do {
+    heartXLeft  = 30  + Math.random() * (W/2 - 20 - 30);
+    heartXRight = W/2 + 30 + Math.random() * (W - 30 - (W/2 + 30));
+    heartAttempts++;
+  } while(heartXRight - heartXLeft < MIN_HEART_GAP && heartAttempts < 20);
+  const heartXes = [heartXLeft, heartXRight];
+
   for(let side = 0; side < 2; side++){
-    const xMin = side === 0 ? 30  : W/2 + 30;
-    const xMax = side === 0 ? W/2 - 20 : W - 30;
-    const x = xMin + Math.random() * (xMax - xMin);
+    const x = heartXes[side];
     items.push({
       x, y: sharedY,
       vx: (Math.random()-0.5)*0.10, vy,
@@ -3056,33 +3066,29 @@ function drawStartScreen() {
     ctx.save();
     ctx.shadowBlur = 0;
 
-    // ── 左上：マイスター取得（secretCleared時のみ・文字のみボタン風）──
-    if(secretCleared){
-      const label = 'マイスター取得';
-      ctx.font = "bold 7.5px -apple-system,'Hiragino Sans','Yu Gothic UI',sans-serif";
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      const tw = ctx.measureText(label).width;
-      const BTN_PAD_X = 5, BTN_PAD_Y = 3;
-      const btnW = tw + BTN_PAD_X * 2;
-      const btnH = 12 + BTN_PAD_Y * 2;
-      const btnX = MARGIN;
-      const btnY = LABEL_Y - btnH / 2;
-      // 背景
-      ctx.save();
-      ctx.globalAlpha = 0.75;
-      ctx.fillStyle = 'rgba(40,28,0,0.7)';
-      ctx.beginPath(); ctx.roundRect(btnX, btnY, btnW, btnH, 4); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,200,0,0.40)';
-      ctx.lineWidth = 0.7;
-      ctx.beginPath(); ctx.roundRect(btnX, btnY, btnW, btnH, 4); ctx.stroke();
-      ctx.restore();
-      // テキスト
-      ctx.shadowColor = 'rgba(255,200,0,0.7)';
-      ctx.shadowBlur  = 4;
-      ctx.fillStyle   = 'rgba(255,220,100,0.92)';
-      ctx.fillText(label, MARGIN + BTN_PAD_X, LABEL_Y);
-      ctx.shadowBlur  = 0;
+    // ── 左上：勲章アイコン（completedCount>=7でエキスパート、secretClearedでマイスターを追加）──
+    {
+      const MEDAL_SIZE = 22;
+      const MEDAL_GAP  = 3;
+      let medalX = MARGIN;
+      const medalY = LABEL_Y - MEDAL_SIZE / 2;
+
+      if(completedCount >= 7 && expertImg.complete && expertImg.naturalWidth > 0){
+        ctx.save();
+        ctx.shadowColor = 'rgba(255,200,80,0.7)';
+        ctx.shadowBlur  = 6;
+        ctx.drawImage(expertImg, medalX, medalY, MEDAL_SIZE, MEDAL_SIZE);
+        ctx.restore();
+        medalX += MEDAL_SIZE + MEDAL_GAP;
+      }
+
+      if(secretCleared && meisterImg.complete && meisterImg.naturalWidth > 0){
+        ctx.save();
+        ctx.shadowColor = 'rgba(255,200,80,0.7)';
+        ctx.shadowBlur  = 6;
+        ctx.drawImage(meisterImg, medalX, medalY, MEDAL_SIZE, MEDAL_SIZE);
+        ctx.restore();
+      }
     }
 
     // ── 右上：記録をリセット（控えめボタン・ホバーで変化）──
@@ -4192,6 +4198,27 @@ function checkCollisions(){
     for(const [px,py] of hitPoints){
       const dx=d.x-px, dy=d.y-py;
       if(dx*dx+dy*dy < r2){ hit=true; break; }
+    }
+    // 補助判定：ロケット胴体の中心軸に沿った線分と隕石の距離チェック
+    // 小さい隕石が横からすり抜けるのを防ぐ（ロケット1のみ爆発）
+    if(!hit){
+      // ロケット胴体を先端(0,-55)→底(0,25)の線分として判定
+      const cos=Math.cos(rocketTilt), sin=Math.sin(rocketTilt);
+      // 胴体左端・右端の4点（横幅13px）でも補完
+      const bodyPoints=[
+        [rx-13*cos, ry-13*sin], // 胴体左
+        [rx+13*cos, ry+13*sin], // 胴体右
+      ];
+      // 先端〜底の中間点を追加
+      for(let t=0;t<=1;t+=0.25){
+        const lx=0, ly=-55+80*t;
+        bodyPoints.push([rx+lx*cos-ly*sin, ry+lx*sin+ly*cos]);
+      }
+      const rHit2=(d.r+12)*(d.r+12);
+      for(const [px,py] of bodyPoints){
+        const dx=d.x-px, dy=d.y-py;
+        if(dx*dx+dy*dy < rHit2){ hit=true; break; }
+      }
     }
     if(hit){
       // 裏ミッション(isSecret)またはsecretCleared（rocket3使用）：隕石を跳ね返す・エネルギー消費なし・爆発しない
@@ -5931,18 +5958,21 @@ function _showCelebrationImpl(isSecretClear, withFanfare) {
     titleEl.innerHTML = '🌟 心臓星 到達！ 🌟<br><span style="font-size:13px;letter-spacing:1px;font-weight:700;opacity:0.85">全ミッション完全制覇</span>';
     subEl.innerHTML   = '地球から遥かな航路を越えて——<br>あなたは心音のエキスパートだ！';
     secretBtn.style.display = '';
-    // 通常クリア：元の画像に戻す
-    celebHeart.src  = 'goal.webp';
+    // 通常クリア（ミッション7）：エキスパート勲章を表示（拍動なし）
+    celebHeart.src  = 'expert.webp';
     celebStetho.src = 'stethoscope.webp';
-    // 通常クリア：拍動アニメを元に戻す
-    celebHeart.style.animation = '';
-    // リングを元に戻す
-    document.getElementById('ring1').style.animation = '';
-    document.getElementById('ring2').style.animation = '';
-    document.getElementById('ring3').style.animation = '';
-    document.getElementById('ring1').style.opacity = '';
-    document.getElementById('ring2').style.opacity = '';
-    document.getElementById('ring3').style.opacity = '';
+    // 勲章：拍動なし・傾きなし（登場アニメのみ）
+    celebHeart.style.animation = 'meisterEntrance 1.1s cubic-bezier(0.34,1.56,0.64,1) 3.0s forwards';
+    // リングを非表示
+    document.getElementById('ring1').style.animation = 'none';
+    document.getElementById('ring2').style.animation = 'none';
+    document.getElementById('ring3').style.animation = 'none';
+    document.getElementById('ring1').style.opacity = '0';
+    document.getElementById('ring2').style.opacity = '0';
+    document.getElementById('ring3').style.opacity = '0';
+    // エキスパートクリアフラグ：completedCount を更新
+    if(completedCount < 7) completedCount = 7;
+    try { localStorage.setItem('shinon_completedCount', String(completedCount)); } catch(e) {}
   }
 
   // 旅の回想ベルト構築

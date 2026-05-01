@@ -742,6 +742,7 @@ const halleyImg    = new Image(); halleyImg.src    = 'halley.webp';
 const energyImg    = new Image(); energyImg.src    = 'energy.webp';
 const expertImg    = new Image(); expertImg.src    = 'expert.webp';
 const meisterImg   = new Image(); meisterImg.src   = 'meister.webp';
+const licensedImg  = new Image(); licensedImg.src  = 'licensed.webp';
 
 // 円形に切り抜いたオフスクリーンCanvas（通常惑星用）
 function makeRoundImg(img, diameter) {
@@ -1177,6 +1178,11 @@ let completedCount = (() => {
 // 裏ミッションクリア済みフラグ（rocket3.webp使用判定）
 let secretCleared = (() => {
   try { return localStorage.getItem('shinon_secretCleared') === '1'; } catch(e) { return false; }
+})();
+
+// ライセンスクリア済みフラグ（ミッション6クリアで付与）
+let licensedCleared = (() => {
+  try { return localStorage.getItem('shinon_licensedCleared') === '1'; } catch(e) { return false; }
 })();
 
 function saveCompletedCount() {
@@ -3066,27 +3072,45 @@ function drawStartScreen() {
     ctx.save();
     ctx.shadowBlur = 0;
 
-    // ── 左上：勲章アイコン（completedCount>=7でエキスパート、secretClearedでマイスターを追加）──
+    // ── 左上：勲章アイコン（左からライセンスド・エキスパート・マイスターの順、縦横比維持）──
     {
-      const MEDAL_SIZE = 22;
-      const MEDAL_GAP  = 3;
+      const MEDAL_H   = 22; // 高さ基準（縦横比は画像から自動計算）
+      const MEDAL_GAP = 3;
       let medalX = MARGIN;
-      const medalY = LABEL_Y - MEDAL_SIZE / 2;
+      const medalY = LABEL_Y - MEDAL_H / 2;
 
-      if(completedCount >= 7 && expertImg.complete && expertImg.naturalWidth > 0){
+      // ライセンスド（completedCount>=6 で表示）
+      if(licensedCleared && licensedImg.complete && licensedImg.naturalWidth > 0){
+        const asp = licensedImg.naturalWidth / Math.max(licensedImg.naturalHeight, 1);
+        const mw = Math.round(MEDAL_H * asp);
         ctx.save();
         ctx.shadowColor = 'rgba(255,200,80,0.7)';
         ctx.shadowBlur  = 6;
-        ctx.drawImage(expertImg, medalX, medalY, MEDAL_SIZE, MEDAL_SIZE);
+        ctx.drawImage(licensedImg, medalX, medalY, mw, MEDAL_H);
         ctx.restore();
-        medalX += MEDAL_SIZE + MEDAL_GAP;
+        medalX += mw + MEDAL_GAP;
       }
 
-      if(secretCleared && meisterImg.complete && meisterImg.naturalWidth > 0){
+      // エキスパート（completedCount>=7 で表示）
+      if(completedCount >= 7 && expertImg.complete && expertImg.naturalWidth > 0){
+        const asp = expertImg.naturalWidth / Math.max(expertImg.naturalHeight, 1);
+        const mw = Math.round(MEDAL_H * asp);
         ctx.save();
         ctx.shadowColor = 'rgba(255,200,80,0.7)';
         ctx.shadowBlur  = 6;
-        ctx.drawImage(meisterImg, medalX, medalY, MEDAL_SIZE, MEDAL_SIZE);
+        ctx.drawImage(expertImg, medalX, medalY, mw, MEDAL_H);
+        ctx.restore();
+        medalX += mw + MEDAL_GAP;
+      }
+
+      // マイスター（secretCleared で表示）
+      if(secretCleared && meisterImg.complete && meisterImg.naturalWidth > 0){
+        const asp = meisterImg.naturalWidth / Math.max(meisterImg.naturalHeight, 1);
+        const mw = Math.round(MEDAL_H * asp);
+        ctx.save();
+        ctx.shadowColor = 'rgba(255,200,80,0.7)';
+        ctx.shadowBlur  = 6;
+        ctx.drawImage(meisterImg, medalX, medalY, mw, MEDAL_H);
         ctx.restore();
       }
     }
@@ -3310,6 +3334,54 @@ function drawStageClearScreen(stageIndex) {
     ctx.fillText('NEXT ▶  ' + nextS.label.split('：')[0], W/2, iconY + iconR2 + 33);
   }
   ctx.restore();
+
+  // ── ミッション6クリア：ライセンス勲章を表示 ──
+  if(stageIndex === 5 && licensedImg.complete && licensedImg.naturalWidth > 0){
+    const medalW = 80;
+    const aspectRatio = licensedImg.naturalWidth / Math.max(licensedImg.naturalHeight, 1);
+    const medalH = medalW / aspectRatio;
+    const medalCenterY = H * 0.73;
+    const medalX = W / 2 - medalW / 2;
+    const medalY = medalCenterY - medalH / 2;
+
+    // 登場タイミング：T>0.6 からフェードイン
+    const medalAlpha = Math.min(1, Math.max(0, (T - 0.6) / 0.5));
+    const medalScale = 0.7 + 0.3 * Math.min(1, Math.max(0, (T - 0.6) / 0.4));
+    const pulseSc = 1 + 0.04 * Math.sin(T * 2.8);
+
+    ctx.save();
+    ctx.globalAlpha = medalAlpha;
+    ctx.translate(W / 2, medalCenterY);
+    ctx.scale(medalScale * pulseSc, medalScale * pulseSc);
+    // 金色グロー
+    ctx.shadowColor = 'rgba(255,210,80,0.85)';
+    ctx.shadowBlur  = 18 + 8 * Math.sin(T * 2.0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(licensedImg, -medalW / 2, -medalH / 2, medalW, medalH);
+    ctx.restore();
+
+    // 「ライセンス取得！」テキスト
+    if(medalAlpha > 0.3){
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, (medalAlpha - 0.3) / 0.7);
+      ctx.textAlign = 'center';
+      ctx.font = "bold 12px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
+      ctx.shadowColor = 'rgba(255,210,80,0.9)';
+      ctx.shadowBlur = 10;
+      const tg = ctx.createLinearGradient(W/2 - 70, 0, W/2 + 70, 0);
+      tg.addColorStop(0,   '#ffe066');
+      tg.addColorStop(0.5, '#ffffff');
+      tg.addColorStop(1,   '#ffcc44');
+      ctx.fillStyle = tg;
+      ctx.fillText('🏅 ライセンス取得！', W / 2, medalY - 10);
+      ctx.shadowBlur = 0;
+      ctx.font = "9px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
+      ctx.fillStyle = `rgba(255,230,160,${0.8 + 0.2*Math.sin(T*1.5)})`;
+      ctx.fillText('心音のライセンスド', W / 2, medalY + medalH + 14);
+      ctx.restore();
+    }
+  }
 
   // 航路マップ（ローカル保存済みのクリア数と現在の大きい方）
   drawProgressMap(Math.max(completedCount, stageIndex + 1));
@@ -4678,6 +4750,11 @@ if(state==='launch_anim'){
       // クリア済みミッション数を更新・保存
       completedCount = Math.max(completedCount, stageIdx + 1);
       saveCompletedCount();
+      // ミッション6クリアでライセンス付与
+      if(stageIdx === 5 && !licensedCleared){
+        licensedCleared = true;
+        try { localStorage.setItem('shinon_licensedCleared', '1'); } catch(e) {}
+      }
       // isAnim()がtrueを返し続けないようにリセット
       arriveT = 0;
       launchT = 0;
@@ -5373,6 +5450,12 @@ document.addEventListener('keydown',e=>{
   if(state !== 'launch_anim') keys[e.key]=true;
   if((e.key===' '||e.key==='Enter')&&!isAnim()&&state!=='playing'){
     e.preventDefault();
+    // 立ち上がり画面（拍動開始ボタンが表示中）のとき → ボタンをクリック扱いにしてスタート画面へ
+    const beatBtn = document.getElementById('beatStartBtn');
+    if(beatBtn && beatBtn.style.display !== 'none' && beatBtn.offsetParent !== null){
+      beatBtn.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+      return;
+    }
     if(state === 'stage_clear'){
       // ミッションクリア後：ボタンと同じく次のステージへ進む
       stageIdx++;
@@ -5432,8 +5515,8 @@ cv.addEventListener('touchstart', (e) => {
       _resetBtnHover = true;
       setTimeout(() => { _resetBtnHover = false; }, 300);
       if(confirm('すべての記録（クリア済みミッション・マイスター勲章）をリセットしますか？')){
-        try{ localStorage.removeItem('shinon_completedCount'); localStorage.removeItem('shinon_secretCleared'); }catch(e2){}
-        completedCount = 0; secretCleared = false; stageIdx = 0; updateBtn();
+        try{ localStorage.removeItem('shinon_completedCount'); localStorage.removeItem('shinon_secretCleared'); localStorage.removeItem('shinon_licensedCleared'); }catch(e2){}
+        completedCount = 0; secretCleared = false; licensedCleared = false; stageIdx = 0; updateBtn();
       }
       return;
     }
@@ -5501,8 +5584,8 @@ cv.addEventListener('click', (e) => {
     const rb = _resetBtnRect;
     if(mx >= rb.x && mx <= rb.x + rb.w && my >= rb.y && my <= rb.y + rb.h){
       if(confirm('すべての記録（クリア済みミッション・マイスター勲章）をリセットしますか？')){
-        try{ localStorage.removeItem('shinon_completedCount'); localStorage.removeItem('shinon_secretCleared'); }catch(e2){}
-        completedCount = 0; secretCleared = false; stageIdx = 0; updateBtn();
+        try{ localStorage.removeItem('shinon_completedCount'); localStorage.removeItem('shinon_secretCleared'); localStorage.removeItem('shinon_licensedCleared'); }catch(e2){}
+        completedCount = 0; secretCleared = false; licensedCleared = false; stageIdx = 0; updateBtn();
       }
       return;
     }

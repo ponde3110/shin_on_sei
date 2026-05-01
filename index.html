@@ -490,7 +490,7 @@ html, body {
 /* ── 拍動開始ボタン ── */
 #beatStartBtn {
   position: absolute;
-  top: 62%;
+  top: 55%;
 
   left: 0;
   right: 0;
@@ -530,6 +530,121 @@ html, body {
   box-shadow:
     0 0 28px rgba(255,120,180,0.9),
     0 0 55px rgba(255,60,140,0.5);
+}
+
+/* ── 初期画面（拍動開始前）：勲章エリア ── */
+#preBeatMedalArea {
+  position: absolute;
+  top: calc(55% + 160px);  /* ボタンから160px下 */
+  left: 0; right: 0;
+  margin: 0 auto;
+  z-index: 210;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+  animation: fadeSlideUp 1.0s ease 0.3s both;
+}
+#preBeatMedalArea .pbmTagline {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 2.5px;
+  color: rgba(200,230,255,0.75);
+  text-shadow: 0 0 8px rgba(100,180,255,0.5);
+  white-space: nowrap;
+}
+#preBeatMedalArea .pbmRow {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 20px;
+}
+#preBeatMedalArea .pbmItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+#preBeatMedalArea .pbmItem img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  filter: none;
+}
+#preBeatMedalArea .pbmItem img.earned {
+  filter: none;
+}
+#preBeatMedalArea .pbmItem .pbmLabel {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: rgba(255,225,140,0.88);
+  text-align: center;
+}
+#preBeatMedalArea .pbmItem .pbmLabel.earned {
+  color: rgba(255,225,140,0.88);
+}
+
+/* ── ライセンス取得お祝いオーバーレイ（ミッション6クリア） ── */
+#licensedCelebOverlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 40%, #001830 0%, #000c18 60%, #000005 100%);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+#licensedCelebOverlay.active { display: flex; }
+#licensedMergeArea {
+  position: relative;
+  width: 220px; height: 220px;
+  flex-shrink: 0;
+  opacity: 0;
+  animation: mergeAreaAppear 0.8s ease 0.2s forwards;
+}
+#licensedCelebHeart {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 120px; height: auto;
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  animation: meisterEntrance 1.1s cubic-bezier(0.34,1.56,0.64,1) 3.0s forwards;
+  filter:
+    drop-shadow(0 0 22px rgba(255,200,60,1))
+    drop-shadow(0 0 50px rgba(255,160,40,0.7))
+    drop-shadow(0 0 80px rgba(200,120,20,0.4));
+}
+#licensedCelebTitle {
+  margin-top: 14px;
+  font-size: 20px; font-weight: 900; color: #fff;
+  text-align: center; letter-spacing: 3px; line-height: 1.3;
+  text-shadow: 0 0 16px rgba(255,220,80,1), 0 0 36px rgba(255,160,40,0.8), 0 0 60px rgba(255,80,20,0.4);
+  animation: titleBlast 0.8s cubic-bezier(0.34,1.56,0.64,1) 4.0s both;
+}
+#licensedCelebSub {
+  margin-top: 8px;
+  font-size: 12px; color: rgba(200,230,255,0.95);
+  text-align: center; letter-spacing: 1px; line-height: 1.7;
+  animation: fadeSlideUp 0.7s ease 4.5s both;
+}
+#licensedCelebClose {
+  margin-top: 18px; padding: 11px 36px;
+  font-size: 14px; font-weight: 800; color: #fff;
+  background: linear-gradient(135deg, #ffaa22 0%, #cc7700 50%, #885500 100%);
+  border: 1px solid rgba(255,200,100,0.5); border-radius: 999px;
+  cursor: pointer; letter-spacing: 1.5px;
+  box-shadow: 0 0 18px rgba(255,160,40,0.7), 0 0 40px rgba(255,120,20,0.35), 0 4px 16px rgba(0,0,0,0.5);
+  animation: fadeSlideUp 0.7s ease 4.8s both;
+  transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
+  pointer-events: auto;
+}
+#licensedCelebClose:hover {
+  transform: scale(1.06); filter: brightness(1.15);
+  box-shadow: 0 0 28px rgba(255,180,60,0.9), 0 0 55px rgba(255,140,30,0.5);
 }
 
 /* 初期状態: startBtn・Canvas は拍動開始後まで非表示 */
@@ -594,6 +709,38 @@ html, body {
 </div>
 <button id="startBtn"></button>
 <button id="beatStartBtn">拍動開始</button>
+
+<!-- 初期画面（拍動開始前）：勲章コレクション表示 -->
+<div id="preBeatMedalArea">
+  <div class="pbmTagline">- 3つの勲章を集めよう -</div>
+  <div class="pbmRow">
+    <div class="pbmItem">
+      <img id="pbmLicensed" src="licensed.webp" alt="ライセンス">
+      <span class="pbmLabel" id="pbmLicensedLabel">ライセンス</span>
+    </div>
+    <div class="pbmItem">
+      <img id="pbmExpert" src="expert.webp" alt="エキスパート">
+      <span class="pbmLabel" id="pbmExpertLabel">エキスパート</span>
+    </div>
+    <div class="pbmItem">
+      <img id="pbmMeister" src="meister.webp" alt="マイスター">
+      <span class="pbmLabel" id="pbmMeisterLabel">マイスター</span>
+    </div>
+  </div>
+</div>
+
+<!-- ライセンス取得お祝いオーバーレイ（ミッション6クリア） -->
+<div id="licensedCelebOverlay">
+  <div id="licensedJourneyReplay" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;animation:journeyFadeOut 1.0s ease 2.8s forwards;">
+    <div id="licensedJourneyTrail" style="display:flex;align-items:center;gap:0;position:absolute;white-space:nowrap;animation:journeySweep 2.6s cubic-bezier(0.25,0.1,0.25,1) forwards;"></div>
+  </div>
+  <div id="licensedMergeArea">
+    <img id="licensedCelebHeart" src="licensed.webp" alt="ライセンス勲章">
+  </div>
+  <div id="licensedCelebTitle">🏅 ライセンス取得！ 🏅<br><span style="font-size:13px;letter-spacing:1px;font-weight:700;opacity:0.85">ミッション6完全制覇</span></div>
+  <div id="licensedCelebSub">地球から太陽系の縁へ——<br>あなたに心音の免許皆伝！</div>
+  <button id="licensedCelebClose">次のミッションへ</button>
+</div>
 <!-- launch.mp3 用 audio 要素：Android オートプレイ対策で DOM に配置 -->
 <audio id="launchAudioEl" src="se/se_launch.mp3" preload="auto" style="display:none"></audio>
 <audio id="seArriveEl"    src="se/se_arrive.mp3"       preload="auto" style="display:none"></audio>
@@ -612,6 +759,7 @@ html, body {
 <audio id="seFanfareEl"   src="se/se_fanfare.mp3"      preload="auto" style="display:none"></audio>
 <audio id="seSecretFanfareEl" src="se/se_secret_clear.mp3" preload="auto" style="display:none"></audio>
 <audio id="seEnergyPickupEl" src="se/se_energy_pickup.mp3" preload="auto" style="display:none"></audio>
+<audio id="seLicensedFanfareEl" src="se/se_licensed_clear.mp3" preload="auto" style="display:none"></audio>
 
 <!-- お祝いオーバーレイ -->
 <div id="celebrationOverlay">
@@ -4750,10 +4898,13 @@ if(state==='launch_anim'){
       // クリア済みミッション数を更新・保存
       completedCount = Math.max(completedCount, stageIdx + 1);
       saveCompletedCount();
-      // ミッション6クリアでライセンス付与
-      if(stageIdx === 5 && !licensedCleared){
-        licensedCleared = true;
-        try { localStorage.setItem('shinon_licensedCleared', '1'); } catch(e) {}
+      // ミッション6クリアでライセンス付与＋お祝いオーバーレイ
+      if(stageIdx === 5){
+        if(!licensedCleared){
+          licensedCleared = true;
+          try { localStorage.setItem('shinon_licensedCleared', '1'); } catch(e) {}
+        }
+        showLicensedCelebration();
       }
       // isAnim()がtrueを返し続けないようにリセット
       arriveT = 0;
@@ -5622,6 +5773,9 @@ cv.addEventListener('click', (e) => {
 document.getElementById('startBtn').addEventListener('pointerdown', (e) => {
   e.stopPropagation();
   e.preventDefault();
+  // ライセンスお祝いが開いていれば閉じる
+  const _lco = document.getElementById('licensedCelebOverlay');
+  if(_lco) _lco.classList.remove('active');
   // --- ゲーム開始処理 ---
   let willLaunch = true;
   if (state === 'stage_clear') {
@@ -5710,6 +5864,95 @@ document.addEventListener('touchend', (e) => {
 // お祝いオーバーレイ制御
 // ===========================
 const celebOverlay = document.getElementById('celebrationOverlay');
+
+// ── 初期画面（pre-beat）の勲章表示を取得状態に更新 ──
+function updatePreBeatMedals() {
+  const setMedal = (imgId, labelId, earned) => {
+    const img   = document.getElementById(imgId);
+    const label = document.getElementById(labelId);
+    if(!img || !label) return;
+    img.classList.toggle('earned', earned);
+    label.classList.toggle('earned', earned);
+  };
+  setMedal('pbmLicensed', 'pbmLicensedLabel', !!licensedCleared);
+  setMedal('pbmExpert',   'pbmExpertLabel',   completedCount >= 7);
+  setMedal('pbmMeister',  'pbmMeisterLabel',  !!secretCleared);
+}
+
+// ── ライセンス取得お祝いオーバーレイ（ミッション6クリア） ──
+function showLicensedCelebration() {
+  const overlay = document.getElementById('licensedCelebOverlay');
+  if(!overlay) return;
+
+  // 旅の回想ベルト（地球→天王星の6惑星）
+  const trail = document.getElementById('licensedJourneyTrail');
+  if(trail){
+    trail.innerHTML = '';
+    const data6 = JOURNEY_DATA.slice(0, 7); // 地球〜天王星
+    data6.forEach((d, i) => {
+      if(i > 0){
+        const line = document.createElement('div');
+        line.style.cssText = `width:18px;height:2px;flex-shrink:0;opacity:0.5;background:linear-gradient(90deg,${data6[i-1].color},${d.color});`;
+        trail.appendChild(line);
+      }
+      const oc = document.createElement('canvas');
+      if(d.isSaturn){
+        oc.width=46; oc.height=28;
+        oc.style.cssText='width:46px;height:28px;flex-shrink:0;';
+        const c=oc.getContext('2d'); c.imageSmoothingEnabled=true; c.imageSmoothingQuality='high';
+        if(d.img.complete&&d.img.naturalWidth) c.drawImage(d.img,0,0,46,28);
+      } else {
+        oc.width=28; oc.height=28;
+        oc.style.cssText='width:28px;height:28px;flex-shrink:0;border-radius:50%;';
+        const c=oc.getContext('2d'); c.imageSmoothingEnabled=true; c.imageSmoothingQuality='high';
+        c.beginPath(); c.arc(14,14,14,0,Math.PI*2); c.clip();
+        if(d.img.complete&&d.img.naturalWidth) c.drawImage(d.img,0,0,28,28);
+        else { c.fillStyle=d.color; c.fill(); }
+      }
+      trail.appendChild(oc);
+    });
+    // アニメリセット
+    const jr = document.getElementById('licensedJourneyReplay');
+    if(jr){ jr.style.animation='none'; void jr.offsetWidth; jr.style.animation=''; }
+    trail.style.animation='none'; void trail.offsetWidth; trail.style.animation='';
+  }
+
+  // 勲章アニメリセット
+  const lHeart = document.getElementById('licensedCelebHeart');
+  if(lHeart){
+    lHeart.style.animation='none'; void lHeart.offsetWidth;
+    lHeart.style.animation='meisterEntrance 1.1s cubic-bezier(0.34,1.56,0.64,1) 3.0s forwards';
+  }
+  const lma = document.getElementById('licensedMergeArea');
+  if(lma){ lma.style.animation='none'; void lma.offsetWidth; lma.style.animation=''; }
+
+  overlay.classList.add('active');
+
+  // ファンファーレ再生
+  _playSE('seLicensedFanfareEl', 0.55);
+
+  // 紙吹雪（金・銀）
+  setTimeout(()=>spawnConfettiGoldSilver(80), 3900);
+  setTimeout(()=>spawnConfettiGoldSilver(50), 4700);
+  setTimeout(()=>spawnSparkles(16), 4000);
+
+  // 初期画面勲章を更新（次回ゲーム起動時のため）
+  updatePreBeatMedals();
+}
+
+// ライセンスお祝い「次のミッションへ」ボタン
+(function(){
+  const btn = document.getElementById('licensedCelebClose');
+  if(!btn) return;
+  btn.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    document.getElementById('licensedCelebOverlay').classList.remove('active');
+    document.querySelectorAll('.confetti,.sparkle').forEach(el=>el.remove());
+    updateBtn();
+  });
+})();
+
+
 const celebClose   = document.getElementById('celebClose');
 const celebHeart   = document.getElementById('celebHeart');
 const celebStetho  = document.getElementById('celebStetho');
@@ -6620,10 +6863,14 @@ document.getElementById('startBtn').addEventListener('pointerdown', () => {
   const canvas   = document.getElementById('rc');
   const orbit    = document.getElementById('orbitPath');
   const startB   = document.getElementById('startBtn');
+  const medalArea = document.getElementById('preBeatMedalArea');
 
   // 初期状態: Canvas・startBtn を隠す
   canvas.classList.add('pre-beat');
   startB.classList.add('pre-beat');
+
+  // 勲章の取得状態を即時反映
+  updatePreBeatMedals();
 
   // スタート画面に戻ったとき（全クリ後リスタート）は beatStartBtn を再表示しない
   // → 2回目以降は通常のスタート画面をそのまま表示
@@ -6631,8 +6878,9 @@ document.getElementById('startBtn').addEventListener('pointerdown', () => {
   beatBtn.addEventListener('pointerdown', (e) => {
     e.stopPropagation();
 
-    // 1. 即座に非表示
+    // 1. 即座に非表示（ボタン＆勲章エリア）
     beatBtn.style.display = 'none';
+    if(medalArea) medalArea.style.display = 'none';
 
     // 2. オーディオアンロック＆apex.mp3 再生・拍動開始
     _audioUnlocked = true;

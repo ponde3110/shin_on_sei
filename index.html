@@ -6093,6 +6093,9 @@ function showLicensedCelebration() {
 
   licensedCelebOverlay.classList.add('active');
 
+  // スタート画面BGMを停止
+  startScreenBgmStop();
+
   // state を licensed_clear に変更（スタート画面から呼ばれた場合も含む）
   state = 'licensed_clear';
 

@@ -313,12 +313,7 @@ html, body {
   width: 220px;
   height: 220px;
   flex-shrink: 0;
-  opacity: 0;
-  animation: mergeAreaAppear 0.8s ease 0.2s forwards;
-}
-@keyframes mergeAreaAppear {
-  from { opacity:0; }
-  to   { opacity:1; }
+  opacity: 1;
 }
 
 .glow-ring {
@@ -330,9 +325,9 @@ html, body {
   pointer-events: none;
   opacity: 0;
 }
-#ring1 { width: 130px; height: 130px; border-color: rgba(255,200,100,0.6); animation: ringPulse 2.0s ease-out 3.8s infinite; }
-#ring2 { width: 160px; height: 160px; border-color: rgba(255,120,180,0.4); animation: ringPulse 2.0s ease-out 4.05s infinite; }
-#ring3 { width: 195px; height: 195px; border-color: rgba(120,180,255,0.25); animation: ringPulse 2.0s ease-out 4.3s infinite; }
+#ring1 { width: 130px; height: 130px; border-color: rgba(255,200,100,0.6); animation: ringPulse 2.0s ease-out 0s infinite; }
+#ring2 { width: 160px; height: 160px; border-color: rgba(255,120,180,0.4); animation: ringPulse 2.0s ease-out 0.25s infinite; }
+#ring3 { width: 195px; height: 195px; border-color: rgba(120,180,255,0.25); animation: ringPulse 2.0s ease-out 0.5s infinite; }
 @keyframes ringPulse {
   0%   { transform: translate(-50%,-50%) scale(0.9); opacity:0.8; }
   60%  { opacity:0.5; }
@@ -344,10 +339,8 @@ html, body {
   left: 50%; top: 50%;
   width: 120px;
   height: auto;
-  transform: translate(-50%, -50%) scale(0);
-  opacity: 0;
-  animation:
-    meisterEntrance 1.1s cubic-bezier(0.34,1.56,0.64,1) 3.0s forwards;
+  transform: translate(-50%, -50%) scale(1.0);
+  opacity: 1;
   filter:
     drop-shadow(0 0 18px rgba(255,200,60,0.9))
     drop-shadow(0 0 40px rgba(255,160,20,0.6))
@@ -382,9 +375,7 @@ html, body {
   width: 130px;
   height: auto;
   transform-origin: center center;
-  animation:
-    stethoOrbit  3.0s linear 0s forwards,
-    stethoSettle 0.9s cubic-bezier(0.34,1.46,0.64,1) 3.0s forwards;
+  transform: translate(-50%,-50%) translate(48px, 40px) rotate(385deg) scale(1.0);
   opacity: 1;
   filter:
     drop-shadow(0 0 5px rgba(255,255,255,1))
@@ -410,7 +401,7 @@ html, body {
   transform: translate(-50%,-50%);
   background: transparent;
   border: 6px solid rgba(255,240,120,0);
-  animation: mergeFlashAnim 0.7s ease-out 3.7s forwards;
+  animation: mergeFlashAnim 0.7s ease-out 0s forwards;
   pointer-events: none;
 }
 @keyframes mergeFlashAnim {
@@ -423,7 +414,7 @@ html, body {
   transform: translate(-50%,-50%);
   background: transparent;
   border: 4px solid rgba(255,160,220,0);
-  animation: mergeFlashAnim2 0.9s ease-out 3.85s forwards;
+  animation: mergeFlashAnim2 0.9s ease-out 0.15s forwards;
   pointer-events: none;
 }
 @keyframes mergeFlashAnim2 {
@@ -436,7 +427,6 @@ html, body {
   font-size: 20px; font-weight: 900; color: #fff;
   text-align: center; letter-spacing: 3px; line-height: 1.3;
   text-shadow: 0 0 16px rgba(255,220,80,1), 0 0 36px rgba(255,160,40,0.8), 0 0 60px rgba(255,80,20,0.4);
-  animation: titleBlast 0.8s cubic-bezier(0.34,1.56,0.64,1) 4.0s both;
 }
 @keyframes titleBlast {
   from { opacity:0; transform: scale(0.6) translateY(20px); letter-spacing:8px; }
@@ -447,7 +437,6 @@ html, body {
   margin-top: 8px;
   font-size: 12px; color: rgba(200,230,255,0.95);
   text-align: center; letter-spacing: 1px; line-height: 1.7;
-  animation: fadeSlideUp 0.7s ease 4.5s both;
 }
 
 #celebClose {
@@ -457,7 +446,6 @@ html, body {
   border: 1px solid rgba(255,180,220,0.5); border-radius: 999px;
   cursor: pointer; letter-spacing: 1.5px;
   box-shadow: 0 0 18px rgba(255,80,150,0.7), 0 0 40px rgba(255,40,120,0.35), 0 4px 16px rgba(0,0,0,0.5);
-  animation: fadeSlideUp 0.7s ease 4.8s both;
   transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
   width: 80%; box-sizing: border-box; display: block; margin-left: auto; margin-right: auto;
 }
@@ -481,7 +469,6 @@ html, body {
   background: linear-gradient(135deg, #4488ff 0%, #1144cc 50%, #002288 100%);
   border: 1px solid rgba(100,180,255,0.5);
   box-shadow: 0 0 18px rgba(60,140,255,0.7), 0 0 40px rgba(40,100,255,0.35), 0 4px 16px rgba(0,0,0,0.5);
-  animation: fadeSlideUp 0.7s ease 5.2s both;
 }
 #secretMissionBtn:hover {
   transform: scale(1.06); filter: brightness(1.15);
@@ -491,7 +478,6 @@ html, body {
   background: linear-gradient(135deg, #44cc88 0%, #119944 50%, #006622 100%);
   border: 1px solid rgba(80,200,140,0.5);
   box-shadow: 0 0 18px rgba(40,180,100,0.7), 0 4px 16px rgba(0,0,0,0.5);
-  animation: fadeSlideUp 0.7s ease 5.5s both;
 }
 #celebMission1Btn:hover {
   transform: scale(1.06); filter: brightness(1.15);
@@ -537,22 +523,20 @@ html, body {
   width: 220px;
   height: 220px;
   flex-shrink: 0;
-  opacity: 0;
-  animation: mergeAreaAppear 0.8s ease 0.2s forwards;
+  opacity: 1;
 }
 
-#licensedRing1 { width: 130px; height: 130px; border-color: rgba(255,200,100,0.6); animation: ringPulse 2.0s ease-out 3.8s infinite; }
-#licensedRing2 { width: 160px; height: 160px; border-color: rgba(255,120,180,0.4); animation: ringPulse 2.0s ease-out 4.05s infinite; }
-#licensedRing3 { width: 195px; height: 195px; border-color: rgba(120,180,255,0.25); animation: ringPulse 2.0s ease-out 4.3s infinite; }
+#licensedRing1 { width: 130px; height: 130px; border-color: rgba(255,200,100,0.6); animation: ringPulse 2.0s ease-out 0s infinite; }
+#licensedRing2 { width: 160px; height: 160px; border-color: rgba(255,120,180,0.4); animation: ringPulse 2.0s ease-out 0.25s infinite; }
+#licensedRing3 { width: 195px; height: 195px; border-color: rgba(120,180,255,0.25); animation: ringPulse 2.0s ease-out 0.5s infinite; }
 
 #licensedCelebHeart {
   position: absolute;
   left: 50%; top: 50%;
   width: 120px;
   height: auto;
-  transform: translate(-50%, -50%) scale(0);
-  opacity: 0;
-  animation: meisterEntrance 1.1s cubic-bezier(0.34,1.56,0.64,1) 3.0s forwards;
+  transform: translate(-50%, -50%) scale(1.0);
+  opacity: 1;
   filter:
     drop-shadow(0 0 18px rgba(255,200,60,0.9))
     drop-shadow(0 0 40px rgba(255,160,20,0.6))
@@ -565,9 +549,7 @@ html, body {
   width: 130px;
   height: auto;
   transform-origin: center center;
-  animation:
-    stethoOrbit  3.0s linear 0s forwards,
-    stethoSettle 0.9s cubic-bezier(0.34,1.46,0.64,1) 3.0s forwards;
+  transform: translate(-50%,-50%) translate(48px, 40px) rotate(385deg) scale(1.0);
   opacity: 1;
   filter:
     drop-shadow(0 0 5px rgba(255,255,255,1))
@@ -581,7 +563,7 @@ html, body {
   transform: translate(-50%,-50%);
   background: transparent;
   border: 6px solid rgba(255,240,120,0);
-  animation: mergeFlashAnim 0.7s ease-out 3.7s forwards;
+  animation: mergeFlashAnim 0.7s ease-out 0s forwards;
   pointer-events: none;
 }
 #licensedMergeFlash2 {
@@ -590,7 +572,7 @@ html, body {
   transform: translate(-50%,-50%);
   background: transparent;
   border: 4px solid rgba(255,160,220,0);
-  animation: mergeFlashAnim2 0.9s ease-out 3.85s forwards;
+  animation: mergeFlashAnim2 0.9s ease-out 0.15s forwards;
   pointer-events: none;
 }
 
@@ -599,14 +581,12 @@ html, body {
   font-size: 20px; font-weight: 900; color: #fff;
   text-align: center; letter-spacing: 3px; line-height: 1.3;
   text-shadow: 0 0 16px rgba(255,220,80,1), 0 0 36px rgba(255,160,40,0.8), 0 0 60px rgba(255,80,20,0.4);
-  animation: titleBlast 0.8s cubic-bezier(0.34,1.56,0.64,1) 4.0s both;
 }
 
 #licensedCelebSub {
   margin-top: 8px;
   font-size: 12px; color: rgba(200,230,255,0.95);
   text-align: center; letter-spacing: 1px; line-height: 1.7;
-  animation: fadeSlideUp 0.7s ease 4.5s both;
 }
 
 #licensedCelebToStart {
@@ -616,7 +596,6 @@ html, body {
   border: 1px solid rgba(255,180,220,0.5); border-radius: 999px;
   cursor: pointer; letter-spacing: 1.5px;
   box-shadow: 0 0 18px rgba(255,80,150,0.7), 0 0 40px rgba(255,40,120,0.35), 0 4px 16px rgba(0,0,0,0.5);
-  animation: fadeSlideUp 0.7s ease 4.8s both;
   transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
   width: 80%; box-sizing: border-box; display: block; margin-left: auto; margin-right: auto;
 }
@@ -634,7 +613,6 @@ html, body {
   border: 1px solid rgba(255,200,100,0.5); border-radius: 999px;
   cursor: pointer; letter-spacing: 1.5px;
   box-shadow: 0 0 18px rgba(255,160,40,0.7), 0 0 40px rgba(255,120,20,0.35), 0 4px 16px rgba(0,0,0,0.5);
-  animation: fadeSlideUp 0.7s ease 5.2s both;
   transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
   width: 80%; box-sizing: border-box;
 }
@@ -865,7 +843,7 @@ function makeRoundImg(img, diameter) {
   oc.width = oc.height = d;
   const c = oc.getContext('2d');
   c.imageSmoothingEnabled = true; 
-  c.imageSmoothingQuality = 'high';
+  c.imageSmoothingQuality = 'medium';
   c.beginPath(); 
   c.arc(d / 2, d / 2, d / 2, 0, Math.PI * 2); 
   c.clip();
@@ -888,7 +866,7 @@ function makeSaturnImg(img, diameter) {
   oc._planetR = d / 2; // 惑星本体の半径（リング除く）
   const c = oc.getContext('2d');
   c.imageSmoothingEnabled = true;
-  c.imageSmoothingQuality = 'high';
+  c.imageSmoothingQuality = 'medium';
   c.drawImage(img, 0, 0, cw, ch);
   return oc;
 }
@@ -1052,6 +1030,16 @@ function unlockAudio() {
   if (state === 'start' && currentBgmFile !== 'apex.mp3') startScreenBgmPlay();
 }
 
+// iOS追加対策: playing中にタッチしたとき心音が停止していたら再開
+function _ensureBgmPlaying() {
+  if (state === 'playing' && currentBgmFile && bgm.paused && !_bgmPlayPromise) {
+    _bgmPlayPromise = bgm.play();
+    if (_bgmPlayPromise) {
+      _bgmPlayPromise.then(() => { _bgmPlayPromise = null; }).catch(() => { _bgmPlayPromise = null; });
+    }
+  }
+}
+
 // ステージ番号(1-8)に対応するmissionのブロックをランダム取得
 function getBlockForStage(stageId) {
   let pool;
@@ -1070,18 +1058,32 @@ function playBgm(soundFile) {
   if (!soundFile) return;
   const targetSrc = new URL('sound/' + soundFile, location.href).href;
   if (currentBgmFile === soundFile && !bgm.paused) return;
-  if (bgm.src !== targetSrc) bgm.src = 'sound/' + soundFile;
-  bgm.loop        = true;
-  bgm.volume      = 0.55;
-  bgm.currentTime = 0;
-  // iOS: play() の Promise を保存して pause() との競合を防ぐ
-  _bgmPlayPromise = bgm.play();
+
+  // iOS対策: play()中にpause()→src変更しないよう、既存のpromiseを先に解決してから変更
+  const doPlay = () => {
+    if (bgm.src !== targetSrc) {
+      bgm.src = 'sound/' + soundFile;
+      bgm.load(); // iOS: srcを変更したらloadが必要
+    }
+    bgm.loop        = true;
+    bgm.volume      = 0.55;
+    bgm.currentTime = 0;
+    // iOS: play() の Promise を保存して pause() との競合を防ぐ
+    _bgmPlayPromise = bgm.play();
+    if (_bgmPlayPromise) {
+      _bgmPlayPromise
+        .then(() => { _bgmPlayPromise = null; })
+        .catch((e) => { _bgmPlayPromise = null; });
+    }
+    currentBgmFile = soundFile;
+  };
+
   if (_bgmPlayPromise) {
-    _bgmPlayPromise
-      .then(() => { _bgmPlayPromise = null; })
-      .catch(() => { _bgmPlayPromise = null; });
+    _bgmPlayPromise.then(doPlay).catch(doPlay);
+    _bgmPlayPromise = null;
+  } else {
+    doPlay();
   }
-  currentBgmFile = soundFile;
 }
 
 // 心音を停止する
@@ -1782,7 +1784,7 @@ const easeOut=t=>1-(1-t)*(1-t);
 function drawPlanet(cx,cy,r,alpha,canvas,fallback){
   ctx.save();
   ctx.globalAlpha=alpha;
-  ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
+  ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality = 'medium';
   if(canvas){
     if(canvas._isSaturn){
       // 土星：横長画像をアスペクト比を保ったまま描画（クリップなし）
@@ -1842,8 +1844,8 @@ function drawBlackhole(bh) {
 
   ctx.save();
 
-  // 1. 引力歪みライン（光の筋）
-  const WLINES = 12;
+  // 1. 引力歪みライン（光の筋）- 6本に削減
+  const WLINES = 6;
   for(let i = 0; i < WLINES; i++){
     const ang = (i / WLINES) * Math.PI * 2 + t * 0.15 + no * 0.01;
     const wobble = 0.04 * Math.sin(i * 1.9 + t * 3.5 + no);
@@ -1873,17 +1875,11 @@ function drawBlackhole(bh) {
     ctx.drawImage(blackholeImg, -drawR, -drawR, drawR * 2, drawR * 2);
     ctx.restore();
 
-    // ── 画像の透明（穴）部分を覆う黒い円（画像より大きめに）──
-    // blackhole.webpの中央透明部分のサイズに合わせて調整
+    // ── 画像の透明（穴）部分を覆う黒い円
     ctx.save();
-    const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.05);
-    coreGrad.addColorStop(0.0,  'rgba(0,0,0,1)');
-    coreGrad.addColorStop(0.75, 'rgba(0,0,0,1)');
-    coreGrad.addColorStop(0.88, 'rgba(0,0,0,0.7)');
-    coreGrad.addColorStop(1.0,  'rgba(0,0,0,0)');
-    ctx.fillStyle = coreGrad;
+    ctx.fillStyle = 'rgba(0,0,0,1)';
     ctx.beginPath();
-    ctx.arc(cx, cy, r * 1.05, 0, Math.PI * 2);
+    ctx.arc(cx, cy, r * 0.88, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   } else {
@@ -1907,7 +1903,6 @@ function drawSuckingObjects(){
     ctx.rotate(s.rot);
     ctx.scale(s.scale, s.scale);
     if(s.type === 'debris'){
-      ctx.filter = 'brightness(1.4) contrast(1.2)';
       if(meteoriteImg.complete && meteoriteImg.naturalWidth > 0){
         const sz = s.origR * 2.4;
         ctx.drawImage(meteoriteImg, -sz/2, -sz/2, sz, sz);
@@ -2498,7 +2493,7 @@ function drawHalleys() {
     ctx.save();
 
     // ── 尾①：メインテール（まっすぐ）
-    const ionSlices = 12;
+    const ionSlices = 6;
     for (let k = 0; k < ionSlices; k++) {
 
       const t1 = k / ionSlices;
@@ -2537,7 +2532,7 @@ function drawHalleys() {
     }
 
     // ── 尾②：ダスト尾（同じく直線）
-    const dustSlices = 10;
+    const dustSlices = 5;
     for (let k = 0; k < dustSlices; k++) {
 
       const t1 = k / dustSlices;
@@ -2671,28 +2666,43 @@ function drawBgDest(){
 }
 
 // --- 発射炎エフェクト（描画） ---
-function drawLaunchFlame(cx,cy){
-  const ft=Date.now()*0.018;
+// 炎キャッシュ（一度だけ生成）
+let _flameCache = null;
+function _buildFlameCache() {
+  const oc = document.createElement('canvas');
+  oc.width = 100; oc.height = 130;
+  const c = oc.getContext('2d');
+  const cx = 50, cy = 50;
+  const gw = c.createRadialGradient(cx, cy+28, 0, cx, cy+28, 40);
+  gw.addColorStop(0, 'rgba(255,120,0,0.18)'); gw.addColorStop(1, 'rgba(255,60,0,0)');
+  c.fillStyle = gw; c.beginPath(); c.ellipse(cx, cy+28, 40, 50, 0, 0, Math.PI*2); c.fill();
+  c.globalAlpha = 0.65;
+  const g1 = c.createRadialGradient(cx, cy+20, 0, cx, cy+36, 26);
+  g1.addColorStop(0, '#ff6600'); g1.addColorStop(1, 'rgba(255,0,0,0)');
+  c.fillStyle = g1; c.beginPath(); c.ellipse(cx, cy+30, 11, 30, 0, 0, Math.PI*2); c.fill();
+  c.globalAlpha = 0.5;
+  const g2 = c.createRadialGradient(cx, cy+18, 0, cx, cy+32, 20);
+  g2.addColorStop(0, '#ff4400'); g2.addColorStop(1, 'rgba(255,80,0,0)');
+  c.fillStyle = g2; c.beginPath(); c.ellipse(cx, cy+26, 8, 22, 0, 0, Math.PI*2); c.fill();
+  c.globalAlpha = 0.85;
+  const g3 = c.createRadialGradient(cx, cy+12, 1, cx, cy+20, 12);
+  g3.addColorStop(0, '#ffee44'); g3.addColorStop(0.5, '#ff8800'); g3.addColorStop(1, 'rgba(255,60,0,0)');
+  c.fillStyle = g3; c.beginPath(); c.ellipse(cx, cy+18, 6, 16, 0, 0, Math.PI*2); c.fill();
+  c.globalAlpha = 0.95;
+  const g4 = c.createRadialGradient(cx, cy+10, 0, cx, cy+13, 5);
+  g4.addColorStop(0, '#ffffff'); g4.addColorStop(0.6, '#ffee88'); g4.addColorStop(1, 'rgba(255,200,0,0)');
+  c.fillStyle = g4; c.beginPath(); c.ellipse(cx, cy+11, 2.5, 7, 0, 0, Math.PI*2); c.fill();
+  return oc;
+}
+
+function drawLaunchFlame(cx, cy) {
+  if (!_flameCache) _flameCache = _buildFlameCache();
+  const ft = Date.now() * 0.018;
+  const wobX = Math.sin(ft) * 3;
+  const wobY = Math.sin(ft * 1.1) * 5;
   ctx.save();
-  const gw=ctx.createRadialGradient(cx,cy+28,0,cx,cy+28,40);
-  gw.addColorStop(0,'rgba(255,120,0,0.18)'); gw.addColorStop(1,'rgba(255,60,0,0)');
-  ctx.fillStyle=gw; ctx.beginPath(); ctx.ellipse(cx,cy+28,40,50,0,0,Math.PI*2); ctx.fill();
-  ctx.globalAlpha=0.65;
-  const g1=ctx.createRadialGradient(cx,cy+20,0,cx,cy+36,26);
-  g1.addColorStop(0,'#ff6600'); g1.addColorStop(1,'rgba(255,0,0,0)');
-  ctx.fillStyle=g1; ctx.beginPath(); ctx.ellipse(cx+Math.sin(ft)*3,cy+30+Math.sin(ft*1.1)*5,11+Math.sin(ft*0.9)*2,30+Math.sin(ft)*7,0,0,Math.PI*2); ctx.fill();
-  ctx.globalAlpha=0.5;
-  const g2=ctx.createRadialGradient(cx,cy+18,0,cx,cy+32,20);
-  g2.addColorStop(0,'#ff4400'); g2.addColorStop(1,'rgba(255,80,0,0)');
-  ctx.fillStyle=g2; ctx.beginPath(); ctx.ellipse(cx+Math.sin(ft*1.3+1)*2,cy+26+Math.sin(ft*0.8+0.5)*4,8+Math.sin(ft*1.2)*2,22+Math.sin(ft*1.3)*5,0,0,Math.PI*2); ctx.fill();
-  ctx.globalAlpha=0.85;
-  const g3=ctx.createRadialGradient(cx,cy+12,1,cx,cy+20,12);
-  g3.addColorStop(0,'#ffee44'); g3.addColorStop(0.5,'#ff8800'); g3.addColorStop(1,'rgba(255,60,0,0)');
-  ctx.fillStyle=g3; ctx.beginPath(); ctx.ellipse(cx,cy+18+Math.sin(ft+2)*2,6+Math.sin(ft*1.5)*1.2,16+Math.sin(ft*1.1)*3,0,0,Math.PI*2); ctx.fill();
-  ctx.globalAlpha=0.95;
-  const g4=ctx.createRadialGradient(cx,cy+10,0,cx,cy+13,5);
-  g4.addColorStop(0,'#ffffff'); g4.addColorStop(0.6,'#ffee88'); g4.addColorStop(1,'rgba(255,200,0,0)');
-  ctx.fillStyle=g4; ctx.beginPath(); ctx.ellipse(cx,cy+11,2.5,7,0,0,Math.PI*2); ctx.fill();
+  ctx.translate(cx + wobX, cy + wobY);
+  ctx.drawImage(_flameCache, -50, -50);
   ctx.restore();
 }
 
@@ -2702,7 +2712,7 @@ function drawRocketAt(cx,cy,showFlame,tilt){
   ctx.save(); ctx.translate(cx,cy);
   const t=tilt||0;
   if(t) ctx.rotate(t);
-  ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
+  ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality = 'medium';
 
   // secretClearedフラグがあればrocket3.webpを使用（全ミッション対応）
   // ミッション8（裏ミッション）はrocket3（またはrocket2）を使用
@@ -2733,13 +2743,10 @@ function drawParticles(){
     ctx.save();
     // 隕石破片の描画（境界を少しボヤけさせる）
     if(p.type==='meteor_debris'){
-      ctx.globalAlpha = p.life; // 生存時間に合わせて透明にする
-      const gr = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 1.5);
-      gr.addColorStop(0, p.color); // 中心は隕石の色
-      gr.addColorStop(1, 'rgba(0,0,0,0)'); // 外側は透明
-      ctx.fillStyle = gr;
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r * 1.5 * p.life, 0, Math.PI * 2); // 大きさも徐々に小さくする
+      ctx.arc(p.x, p.y, p.r * 1.5 * p.life, 0, Math.PI * 2);
       ctx.fill();
     }
     else if(p.type==='smoke'){
@@ -2747,17 +2754,21 @@ function drawParticles(){
       ctx.beginPath(); ctx.arc(p.x,p.y,(p.r||6)*(2-p.life),0,Math.PI*2); ctx.fill();
     }else if(p.type==='core'){
       ctx.globalAlpha=p.life*0.9;
-      const gr=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*2);
-      gr.addColorStop(0,'#ffffff'); gr.addColorStop(0.5,p.color); gr.addColorStop(1,'rgba(255,200,0,0)');
-      ctx.fillStyle=gr; ctx.beginPath(); ctx.arc(p.x,p.y,p.r*2*p.life,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,0.9)';
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r*0.6*p.life,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=p.life*0.5;
+      ctx.fillStyle=p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r*2*p.life,0,Math.PI*2); ctx.fill();
     }else if(p.type==='spark'){
       ctx.globalAlpha=p.life; ctx.strokeStyle=p.color; ctx.lineWidth=1;
       ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x-p.vx*3,p.y-p.vy*3); ctx.stroke();
     }else if(p.type==='thruster'){
       ctx.globalAlpha=p.life*0.9;
-      const tr=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*3);
-      tr.addColorStop(0,'#ffffff'); tr.addColorStop(0.3,p.color); tr.addColorStop(1,'rgba(255,60,0,0)');
-      ctx.fillStyle=tr; ctx.beginPath(); ctx.arc(p.x,p.y,p.r*2.5*p.life,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,0.8)';
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r*0.8*p.life,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=p.life*0.5;
+      ctx.fillStyle=p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r*2.5*p.life,0,Math.PI*2); ctx.fill();
     }else{
       ctx.globalAlpha=p.life*(p.isFlame?0.85:0.5); ctx.fillStyle=p.color;
       ctx.beginPath(); ctx.arc(p.x,p.y,p.isFlame?4*p.life:2*p.life,0,Math.PI*2); ctx.fill();
@@ -2770,8 +2781,8 @@ function drawParticles(){
 // --- 隕石 ---
 function drawMeteor(d){
   ctx.save(); ctx.translate(d.x,d.y); ctx.rotate(d.rot);
-  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  ctx.filter='brightness(1.4) contrast(1.2)'; ctx.scale(-1,1);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'medium';
+  ctx.scale(-1,1);
   if(meteoriteImg.complete&&meteoriteImg.naturalWidth>0){
     const s=d.r*2.4; ctx.drawImage(meteoriteImg,-s/2,-s/2,s,s);
   }else{
@@ -2806,7 +2817,7 @@ function drawHeartItem(it){
     const w = base;
     const h = base * ratio;
     ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
+    ctx.imageSmoothingQuality = 'medium';
     ctx.drawImage(heartImg, -w / 2, -h / 2, w, h);
   } 
   // --- フォールバック（ベクターハート・色統一） ---
@@ -2857,35 +2868,10 @@ function drawHUD(){
   ctx.fillText(s.label,W/2,14);
   ctx.restore();
 
-  // 一行: [出発] [バー] [目標]
+  // 一行: [バー] のみ（出発・到着星は不要）
   const ICO=10,BAR_Y=27,BAR_H=7;
-  const LEFT_X=MARGIN+ICO*2+6, RIGHT_X=W-MARGIN-ICO*2-6;
+  const LEFT_X=MARGIN+4, RIGHT_X=W-MARGIN-4;
   const BAR_W=RIGHT_X-LEFT_X;
-  const fromX=MARGIN+ICO+2, toX=W-MARGIN-ICO-2;
-
-  // 惑星アイコン描画ヘルパー（土星はリング付き横長で描画）
-  function drawPlanetIcon(c, cx, cy, r, fallColor){
-    ctx.save(); ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
-    if(c){
-      if(c._isSaturn){
-        const aspect = c.width / Math.max(c.height,1);
-        const dh = r * 2, dw = dh * aspect;
-        ctx.drawImage(c, 0, 0, c.width, c.height, cx - dw/2, cy - dh/2, dw, dh);
-      } else {
-        ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.clip();
-        ctx.drawImage(c,0,0,c.width,c.height,cx-r,cy-r,r*2,r*2);
-      }
-    } else {
-      ctx.fillStyle=fallColor; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
-    }
-    ctx.restore();
-  }
-
-  // 出発惑星（HUD専用高解像度キャッシュを使用）
-  drawPlanetIcon(s.getHudFrom ? s.getHudFrom() : s.getFrom(), fromX, BAR_Y, ICO, s.fromColor);
-
-  // 目標惑星（HUD専用高解像度キャッシュを使用）
-  drawPlanetIcon(s.getHudTo ? s.getHudTo() : s.getTo(), toX, BAR_Y, ICO, s.toColor);
 
   // 進行バー
   ctx.save();
@@ -2911,8 +2897,6 @@ function drawHUD(){
     ctx.save();
     ctx.globalAlpha = pulse;
     ctx.fillStyle = '#ffffff';
-    ctx.shadowColor = 'rgba(80,200,255,1)';
-    ctx.shadowBlur = 10;
     ctx.font = "bold 16px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -2923,8 +2907,6 @@ function drawHUD(){
     ctx.save();
     ctx.globalAlpha = pulse;
     ctx.fillStyle = '#ffffff';
-    ctx.shadowColor = 'rgba(80,200,255,1)';
-    ctx.shadowBlur = 10;
     ctx.font = "bold 16px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -3098,23 +3080,13 @@ let _uiTime = 0; // UI animation time accumulator
 function drawStartScreen() {
   const T = _uiTime;
 
-  // 全体ダークオーバーレイ（グラデーション）
-  const bg = ctx.createRadialGradient(W/2, H*0.42, 0, W/2, H*0.42, W*0.85);
-  bg.addColorStop(0,   'rgba(10,0,40,0.82)');
-  bg.addColorStop(0.6, 'rgba(0,5,25,0.90)');
-  bg.addColorStop(1,   'rgba(0,0,10,0.95)');
-  ctx.fillStyle = bg;
+  // 全体ダークオーバーレイ
+  ctx.fillStyle = 'rgba(2,0,22,0.92)';
   ctx.fillRect(0, 0, W, H);
 
-  // --- 上部：タイトルエリア ---
+  // タイトル光輪（単色半透明）
   const titleY = H * 0.17;
-
-  // タイトル光輪
-  const glow = ctx.createRadialGradient(W/2, titleY, 0, W/2, titleY, 90);
-  glow.addColorStop(0,   `rgba(80,120,255,${0.18 + 0.08*Math.sin(T*1.8)})`);
-  glow.addColorStop(0.5, `rgba(40,80,200,${0.08 + 0.04*Math.sin(T*2.1)})`);
-  glow.addColorStop(1,   'rgba(0,0,0,0)');
-  ctx.fillStyle = glow;
+  ctx.fillStyle = `rgba(60,100,220,${0.14 + 0.06*Math.sin(T*1.8)})`;
   ctx.fillRect(0, titleY - 60, W, 120);
 
   // タイトル：サブ
@@ -3355,31 +3327,20 @@ function drawStageClearScreen(stageIndex) {
   const nextS = STAGES[stageIndex + 1];
 
   // オーバーレイ
-  const bg = ctx.createRadialGradient(W/2, H*0.38, 0, W/2, H*0.38, W*0.9);
-  bg.addColorStop(0,   'rgba(0,20,10,0.88)');
-  bg.addColorStop(0.5, 'rgba(0,10,30,0.92)');
-  bg.addColorStop(1,   'rgba(0,0,10,0.96)');
-  ctx.fillStyle = bg;
+  ctx.fillStyle = 'rgba(0,8,20,0.93)';
   ctx.fillRect(0, 0, W, H);
 
   // SUCCESS バナー背景
   const bannerY = H * 0.13;
   const bannerH = 70;
   ctx.save();
-  const bannerG = ctx.createLinearGradient(0, bannerY, 0, bannerY + bannerH);
-  bannerG.addColorStop(0,   `rgba(0,60,20,${0.5 + 0.1*Math.sin(T*2)})`);
-  bannerG.addColorStop(0.5, `rgba(0,100,40,${0.35})`);
-  bannerG.addColorStop(1,   'rgba(0,20,10,0)');
-  ctx.fillStyle = bannerG;
+  ctx.fillStyle = `rgba(0,80,30,${0.38 + 0.08*Math.sin(T*2)})`;
   ctx.fillRect(0, bannerY, W, bannerH);
 
-  // 左右の光線
+  // 左右の光線（単色）
   for(let side = -1; side <= 1; side += 2){
     const rx = W/2 + side * (30 + 40 * Math.abs(Math.sin(T * 0.9)));
-    const rg = ctx.createLinearGradient(W/2, bannerY + bannerH/2, rx, bannerY + bannerH/2);
-    rg.addColorStop(0,   `rgba(80,255,140,${0.18 + 0.08*Math.sin(T*1.8)})`);
-    rg.addColorStop(1,   'rgba(80,255,140,0)');
-    ctx.fillStyle = rg;
+    ctx.fillStyle = `rgba(80,255,140,${0.10 + 0.05*Math.sin(T*1.8)})`;
     ctx.fillRect(Math.min(W/2, rx), bannerY, Math.abs(rx - W/2), bannerH);
   }
 
@@ -3423,7 +3384,7 @@ function drawStageClearScreen(stageIndex) {
   }
 
   ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
+  ctx.imageSmoothingQuality = 'medium';
   if(toImg && toImg.complete && toImg.naturalWidth){
     const isSaturn = (stageIndex + 1 === 4); // 土星はindex4
     if(isSaturn){
@@ -3470,11 +3431,7 @@ function drawGameOverScreen() {
   const T = _uiTime;
 
   // ── 背景：深宇宙ブラック＋青紫ネビュラ ──
-  const bg = ctx.createRadialGradient(W/2, H*0.28, 0, W/2, H*0.28, W*1.1);
-  bg.addColorStop(0,   'rgba(10,0,30,0.92)');
-  bg.addColorStop(0.5, 'rgba(4,0,18,0.95)');
-  bg.addColorStop(1,   'rgba(0,0,8,0.98)');
-  ctx.fillStyle = bg;
+  ctx.fillStyle = 'rgba(3,0,14,0.96)';
   ctx.fillRect(0, 0, W, H);
 
   ctx.save();
@@ -3631,8 +3588,8 @@ function drawOverlay(t1,t2,t3){
 }
 
 function drawHitFlash(){
+  // エネルギーが減る時のみ赤い画面反転（pickupFlash=エネルギー増加は反転しない）
   if(hitFlash>0){ctx.fillStyle=`rgba(255,40,0,${hitFlash*0.35})`;ctx.fillRect(0,0,W,H);}
-  if(pickupFlash>0){ctx.fillStyle=`rgba(0,220,180,${pickupFlash*0.3})`;ctx.fillRect(0,0,W,H);}
 }
 
 // --- 出発アニメーション（修正版） ---
@@ -3666,8 +3623,7 @@ function drawLaunchAnim(){
     const glowA = 0.55 + 0.35 * (1.0 - heartScale / 1.0);
     const drawR = fromR * heartScale;
     ctx.save();
-    ctx.shadowColor = `rgba(255,100,160,${glowA})`;
-    ctx.shadowBlur = 30 + 20 * (1.0 - heartScale);
+    ctx.globalAlpha = 0.6 + 0.4 * (1.0 - heartScale);
     drawPlanet(W/2, fromY, drawR, 1, s.getFrom(), s.fromColor);
     ctx.restore();
   } else {
@@ -3685,7 +3641,7 @@ function drawLaunchAnim(){
       const drawW = drawH * aspect;
       ctx.globalAlpha = 1;
       ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
+      ctx.imageSmoothingQuality = 'medium';
       ctx.drawImage(fromCanvas, 0, 0, fromCanvas.width, fromCanvas.height,
                     -drawW/2, -drawH/2, drawW, drawH);
       ctx.restore();
@@ -3958,8 +3914,6 @@ function drawAstronaut(a){
 
   ctx.save();
   ctx.globalAlpha = a.captureAlpha !== undefined ? a.captureAlpha : 1;
-  ctx.shadowBlur = 15;
-  ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
 
   ctx.translate(a.x, a.y);
   const sc = (a.captureScale !== undefined && a.captureScale < 1) ? a.captureScale : 1;
@@ -3970,8 +3924,6 @@ function drawAstronaut(a){
     const blink = Math.sin(Date.now() * 0.004) > 0;
     if(blink){
       ctx.save();
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = '#0f0';
       ctx.fillStyle = '#aaffaa';
       ctx.font = "bold 11px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
       ctx.textAlign = 'center';
@@ -4236,7 +4188,7 @@ function drawProgressMap(completedMissions, yOffset){
 
     ctx.save();
     ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
+    ctx.imageSmoothingQuality = 'medium';
     if(!isVisible){
       ctx.globalAlpha = 0.18;
     }
@@ -4283,8 +4235,6 @@ function drawProgressMap(completedMissions, yOffset){
     if(isGoal && completedMissions >= N - 1){
       const pulse = 0.7 + 0.3 * Math.abs(Math.sin(_uiTime * 2.2));
       ctx.save();
-      ctx.shadowColor = `rgba(100,255,180,${0.7 * pulse})`;
-      ctx.shadowBlur = 6 * pulse;
       ctx.strokeStyle = `rgba(100,255,180,${0.85 * pulse})`;
       ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(x, lineY, iconR + 2, 0, Math.PI * 2); ctx.stroke();
@@ -4296,8 +4246,6 @@ function drawProgressMap(completedMissions, yOffset){
       ctx.save();
       ctx.strokeStyle = 'rgba(255,255,180,0.95)';
       ctx.lineWidth = 2;
-      ctx.shadowColor = 'rgba(255,255,100,0.9)';
-      ctx.shadowBlur = 8;
       ctx.beginPath(); ctx.arc(x, lineY, iconR + 4, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     }
@@ -4380,9 +4328,7 @@ function checkCollisions(){
         d.vx += nx2 * impulse;
         d.vy += ny2 * impulse;
         d.rotV = (Math.random()-0.5) * 0.06;
-        // rocket2(isSecret)・rocket3（secretCleared）は隕石ヒットでもエネルギー消費しない
-        // （どちらの条件でもエネルギー消費なし）
-        hitFlash = 0.3;
+        // rocket2(isSecret)・rocket3（secretCleared）は隕石ヒットでもエネルギー消費なし・画面反転なし
         playBounceHitSE();
         shakeX=(Math.random()-0.5)*4; shakeY=(Math.random()-0.5)*3;
         setTimeout(()=>{shakeX=0;shakeY=0;},80);
@@ -4561,9 +4507,13 @@ function checkHalleyCollisions(){
 // バックグラウンド一時停止フラグ
 let _pausedByVisibility = false;
 
+const FPS_INTERVAL = 1000 / 60; // 60fps キャップ
+
 function loop(ts){
-  const dt=Math.min((ts-lastTime)/1000,0.05);
-  lastTime=ts;
+  const elapsed = ts - lastTime;
+  if (elapsed < FPS_INTERVAL) { requestAnimationFrame(loop); return; }
+  const dt=Math.min(elapsed/1000,0.05);
+  lastTime = ts - (elapsed % FPS_INTERVAL);
 
   // バックグラウンド中はゲームを進行しない（描画もスキップ）
   if (_pausedByVisibility) {
@@ -4688,15 +4638,13 @@ if(state==='launch_anim'){
         ctx.fillStyle = p.color;
         ctx.beginPath(); ctx.arc(p.x, p.y, growR, 0, Math.PI*2); ctx.fill();
       } else if(p.isFireball){
-        // 炎球（発光グラデ）
-        ctx.shadowColor = p.color;
-        ctx.shadowBlur = p.r * 3;
-        const fg = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 2.2 * p.life);
-        fg.addColorStop(0,   '#ffffff');
-        fg.addColorStop(0.25, p.color);
-        fg.addColorStop(1,   'rgba(255,60,0,0)');
-        ctx.fillStyle = fg;
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 2.2 * p.life, 0, Math.PI*2); ctx.fill();
+        // 炎球（シンプル2段円）
+        const rad = p.r * 2.2 * p.life;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(p.x, p.y, rad * 0.35, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha = alpha * 0.55;
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(p.x, p.y, rad, 0, Math.PI*2); ctx.fill();
       } else if(p.isDebris){
         // 金属破片（軌跡＋回転四角）
         if(p.trail && p.trail.length > 1){
@@ -4711,11 +4659,9 @@ if(state==='launch_anim'){
         }
         ctx.translate(p.x, p.y); ctx.rotate(p.rot || 0);
         ctx.fillStyle = p.color;
-        ctx.shadowColor = 'rgba(255,180,80,0.5)';
-        ctx.shadowBlur = 4;
         ctx.fillRect(-p.r*0.6, -p.r*0.35, p.r*1.2, p.r*0.7);
       } else if(p.isEmber){
-        // 火の粉（軌跡＋先端グロー）
+        // 火の粉（軌跡＋先端）
         if(p.trail && p.trail.length > 1){
           ctx.globalAlpha = alpha * 0.5;
           ctx.strokeStyle = p.color;
@@ -4727,8 +4673,6 @@ if(state==='launch_anim'){
           ctx.stroke();
           ctx.globalAlpha = alpha;
         }
-        ctx.shadowColor = p.color;
-        ctx.shadowBlur = p.r * 4;
         ctx.fillStyle = '#ffffff';
         ctx.beginPath(); ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI*2); ctx.fill();
       }
@@ -4907,7 +4851,9 @@ if(state==='launch_anim'){
     if(hitFlash>0)    hitFlash-=dt;
     if(pickupFlash>0) pickupFlash-=dt;
 
-    addExhaust(rocketX,H-90+8);
+    // 排気パーティクルは3フレームに1回に間引き
+    if(!window._exhaustFrame) window._exhaustFrame = 0;
+    if(++window._exhaustFrame >= 3){ window._exhaustFrame = 0; addExhaust(rocketX,H-90+8); }
     for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life-=dt/p.maxLife;}
     particles=particles.filter(p=>p.life>0);
 
@@ -4915,11 +4861,12 @@ if(state==='launch_anim'){
     for(const d of debris){d.x+=d.vx*dtScale;d.y+=d.vy*dtScale;d.rot+=d.rotV*dtScale;}
     debris=debris.filter(d=>d.y<H+40&&d.x<W+40&&d.alive);
 
-    // 隕石同士の衝突
-    for(let i=0;i<debris.length;i++){
-      const a=debris[i]; if(!a.alive) continue;
-      for(let j=i+1;j<debris.length;j++){
-        const b=debris[j]; if(!b.alive) continue;
+    // 隕石同士の衝突（最大8個まで判定でコスト抑制）
+    const debrisCheck = debris.filter(d => d.alive).slice(0, 8);
+    for(let i=0;i<debrisCheck.length;i++){
+      const a=debrisCheck[i];
+      for(let j=i+1;j<debrisCheck.length;j++){
+        const b=debrisCheck[j];
         const dx=b.x-a.x, dy=b.y-a.y;
         const dist2=dx*dx+dy*dy;
         const minD=a.r+b.r;
@@ -5166,7 +5113,7 @@ function drawSecretScrollPlanets() {
     ctx.save();
     ctx.globalAlpha = p.alpha; // 不透過（alpha=1で完全不透過）
     ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
+    ctx.imageSmoothingQuality = 'medium';
 
     // グロー
     ctx.shadowColor = 'rgba(180,220,255,0.7)';
@@ -5586,6 +5533,7 @@ cv.addEventListener('touchstart', (e) => {
   // iOS: ジェスチャースコープを保持するため await せずに即座にアンロックし、
   //      アクションも同一イベント内で実行する
   unlockAudio();
+  _ensureBgmPlaying(); // iOS: playing中に心音が止まっていたら即再開
 
   const t = e.touches[0];
   if(!t) return;
@@ -5625,21 +5573,19 @@ cv.addEventListener('touchstart', (e) => {
   }
 
   if(stage >= 0){
-    // インデックス7（N-1）は心臓星 → エキスパートお祝いを表示
+    // 心臓星（index=7）→ ミッション8を直接開始
     if(stage === 7){
-      stageIdx = 6;
-      showCelebration();
+      startFromMap(7);
       return;
     }
-    // インデックス6（海王星）→ ライセンスお祝い（取得済みのみ）
+    // 海王星（index=6）→ ミッション7を直接開始（ライセンス取得済みの場合のみ）
     if(stage === 6 && licensedCleared){
-      showLicensedCelebration();
+      startFromMap(6);
       return;
     }
-    // インデックス0（地球）→ マイスターお祝い（取得済みのみ）
+    // 地球（index=0）→ ミッション1を直接開始（マイスター取得済みの場合のみ）
     if(stage === 0 && secretCleared){
-      stageIdx = 7;
-      showCelebration();
+      startFromMap(0);
       return;
     }
     startFromMap(stage);
@@ -5716,21 +5662,19 @@ cv.addEventListener('click', (e) => {
   const stage = getClickedStage(mx, my);
 
   if (stage >= 0) {
-    // インデックス7（N-1）は心臓星 → エキスパートお祝いを表示
+    // 心臓星（index=7）→ ミッション8を直接開始
     if (stage === 7) {
-      stageIdx = 6;
-      showCelebration();
+      startFromMap(7);
       return;
     }
-    // インデックス6（海王星）→ ライセンスお祝い（取得済みのみ）
+    // 海王星（index=6）→ ミッション7を直接開始（ライセンス取得済みの場合のみ）
     if (stage === 6 && licensedCleared) {
-      showLicensedCelebration();
+      startFromMap(6);
       return;
     }
-    // インデックス0（地球）→ マイスターお祝い（取得済みのみ）
+    // 地球（index=0）→ ミッション1を直接開始（マイスター取得済みの場合のみ）
     if (stage === 0 && secretCleared) {
-      stageIdx = 7;
-      showCelebration();
+      startFromMap(0);
       return;
     }
     // クリア済みのステージならそこから開始
@@ -5871,24 +5815,27 @@ function showLicensedCelebration() {
   licensedCelebHeart.src  = 'licensed.webp';
   licensedCelebStetho.src = 'stethoscope.webp';
 
-  // 全アニメーションリセット
-  resetAnim(licensedCelebHeart);
-  resetAnim(licensedCelebStetho);
+  // 勲章・聴診器：アニメなし・即時表示
+  licensedCelebHeart.style.animation = 'none';
+  licensedCelebHeart.style.transform = 'translate(-50%, -50%) scale(1.0)';
+  licensedCelebHeart.style.opacity = '1';
+
+  // flash アニメリセット（即時発火）
   resetAnim(licensedCelebFlash);
   resetAnim(licensedCelebFlash2);
   document.querySelectorAll('.confetti,.sparkle').forEach(e=>e.remove());
 
-  // mergeArea リセット
+  // mergeArea：即時表示
   const lma = document.getElementById('licensedMergeArea');
-  if(lma){ lma.style.animation='none'; void lma.offsetWidth; lma.style.animation=''; }
+  if(lma){ lma.style.animation='none'; lma.style.opacity='1'; }
 
-  // リング リセット
+  // リング：即時開始
   const lr1 = document.getElementById('licensedRing1');
   const lr2 = document.getElementById('licensedRing2');
   const lr3 = document.getElementById('licensedRing3');
-  if(lr1){ lr1.style.animation='none'; void lr1.offsetWidth; lr1.style.animation='ringPulse 2.0s ease-out 3.8s infinite'; }
-  if(lr2){ lr2.style.animation='none'; void lr2.offsetWidth; lr2.style.animation='ringPulse 2.0s ease-out 4.05s infinite'; }
-  if(lr3){ lr3.style.animation='none'; void lr3.offsetWidth; lr3.style.animation='ringPulse 2.0s ease-out 4.3s infinite'; }
+  if(lr1){ lr1.style.animation='none'; void lr1.offsetWidth; lr1.style.animation='ringPulse 2.0s ease-out 0s infinite'; lr1.style.opacity=''; }
+  if(lr2){ lr2.style.animation='none'; void lr2.offsetWidth; lr2.style.animation='ringPulse 2.0s ease-out 0.25s infinite'; lr2.style.opacity=''; }
+  if(lr3){ lr3.style.animation='none'; void lr3.offsetWidth; lr3.style.animation='ringPulse 2.0s ease-out 0.5s infinite'; lr3.style.opacity=''; }
 
   licensedCelebOverlay.classList.add('active');
 
@@ -5904,11 +5851,11 @@ function showLicensedCelebration() {
   // ファンファーレ
   _playSE('seLicensedFanfareEl', 0.55);
 
-  // 白一色の紙吹雪
-  setTimeout(()=>spawnConfettiWhite(100), 3900);
-  setTimeout(()=>spawnConfettiWhite(60),  4700);
-  setTimeout(()=>spawnSparkles(20), 4000);
-  setTimeout(()=>spawnSparkles(14), 5200);
+  // 紙吹雪：即時開始
+  spawnConfettiWhite(100);
+  setTimeout(()=>spawnConfettiWhite(60),  800);
+  spawnSparkles(20);
+  setTimeout(()=>spawnSparkles(14), 1200);
 
   // 初期画面勲章を更新
   updatePreBeatMedals();
@@ -5978,7 +5925,7 @@ function buildJourneyTrail() {
       oc.style.cssText = 'width:46px;height:28px;flex-shrink:0;';
       const c = oc.getContext('2d');
       c.imageSmoothingEnabled = true;
-      c.imageSmoothingQuality = 'high';
+      c.imageSmoothingQuality = 'medium';
       if(d.img.complete && d.img.naturalWidth){
         c.drawImage(d.img, 0, 0, 46, 28);
       }
@@ -5987,7 +5934,7 @@ function buildJourneyTrail() {
       oc.style.cssText = `width:28px;height:28px;flex-shrink:0;border-radius:50%;${i===7?'box-shadow:0 0 8px rgba(255,200,100,0.9);':''}`;
       const c = oc.getContext('2d');
       c.imageSmoothingEnabled = true;
-      c.imageSmoothingQuality = 'high';
+      c.imageSmoothingQuality = 'medium';
       c.beginPath(); c.arc(14,14,14,0,Math.PI*2); c.clip();
       if(d.img.complete && d.img.naturalWidth){
         const iw=d.img.naturalWidth,ih=d.img.naturalHeight;
@@ -6361,18 +6308,20 @@ function _showCelebrationImpl(isSecretClear, withFanfare) {
     subEl.innerHTML   = '心臓星から長い航路を経て——<br>あなたは心音のマイスターだ！';
     secretBtn.style.display = 'none';
     document.getElementById('celebMission1Btn').style.display = '';
-    // 裏ミッションクリア：meister.webp を使用（まっすぐ・拍動なし）
+    // 裏ミッションクリア：meister.webp を使用（まっすぐ・即時表示）
     celebHeart.src  = 'meister.webp';
     celebStetho.src = 'stethoscope3.webp';
-    // 勲章：拍動なし・傾きなし（登場アニメのみ、rotate除去版）
-    celebHeart.style.animation = 'meisterEntrance 1.1s cubic-bezier(0.34,1.56,0.64,1) 3.0s forwards';
-    // リングを非表示
-    document.getElementById('ring1').style.animation = 'none';
-    document.getElementById('ring2').style.animation = 'none';
-    document.getElementById('ring3').style.animation = 'none';
-    document.getElementById('ring1').style.opacity = '0';
-    document.getElementById('ring2').style.opacity = '0';
-    document.getElementById('ring3').style.opacity = '0';
+    // 勲章：アニメなし・即時表示
+    celebHeart.style.animation = 'none';
+    celebHeart.style.transform = 'translate(-50%, -50%) scale(1.0)';
+    celebHeart.style.opacity = '1';
+    // リングを表示
+    document.getElementById('ring1').style.animation = 'ringPulse 2.0s ease-out 0s infinite';
+    document.getElementById('ring2').style.animation = 'ringPulse 2.0s ease-out 0.25s infinite';
+    document.getElementById('ring3').style.animation = 'ringPulse 2.0s ease-out 0.5s infinite';
+    document.getElementById('ring1').style.opacity = '';
+    document.getElementById('ring2').style.opacity = '';
+    document.getElementById('ring3').style.opacity = '';
     // 裏ミッションクリアフラグを保存（以降rocket3.webp使用）
     secretCleared = true;
     try { localStorage.setItem('shinon_secretCleared', '1'); } catch(e) {}
@@ -6381,18 +6330,20 @@ function _showCelebrationImpl(isSecretClear, withFanfare) {
     subEl.innerHTML   = '地球から遥かな航路を越えて——<br>あなたは心音のエキスパートだ！';
     secretBtn.style.display = '';
     document.getElementById('celebMission1Btn').style.display = 'none';
-    // 通常クリア（ミッション7）：エキスパート勲章を表示（拍動なし）
+    // 通常クリア（ミッション7）：エキスパート勲章を表示（即時表示）
     celebHeart.src  = 'expert.webp';
     celebStetho.src = 'stethoscope2.webp';
-    // 勲章：拍動なし・傾きなし（登場アニメのみ）
-    celebHeart.style.animation = 'meisterEntrance 1.1s cubic-bezier(0.34,1.56,0.64,1) 3.0s forwards';
-    // リングを非表示
-    document.getElementById('ring1').style.animation = 'none';
-    document.getElementById('ring2').style.animation = 'none';
-    document.getElementById('ring3').style.animation = 'none';
-    document.getElementById('ring1').style.opacity = '0';
-    document.getElementById('ring2').style.opacity = '0';
-    document.getElementById('ring3').style.opacity = '0';
+    // 勲章：アニメなし・即時表示
+    celebHeart.style.animation = 'none';
+    celebHeart.style.transform = 'translate(-50%, -50%) scale(1.0)';
+    celebHeart.style.opacity = '1';
+    // リングを表示
+    document.getElementById('ring1').style.animation = 'ringPulse 2.0s ease-out 0s infinite';
+    document.getElementById('ring2').style.animation = 'ringPulse 2.0s ease-out 0.25s infinite';
+    document.getElementById('ring3').style.animation = 'ringPulse 2.0s ease-out 0.5s infinite';
+    document.getElementById('ring1').style.opacity = '';
+    document.getElementById('ring2').style.opacity = '';
+    document.getElementById('ring3').style.opacity = '';
     // エキスパートクリアフラグ：completedCount を更新
     if(completedCount < 7) completedCount = 7;
     try { localStorage.setItem('shinon_completedCount', String(completedCount)); } catch(e) {}
@@ -6414,10 +6365,9 @@ function _showCelebrationImpl(isSecretClear, withFanfare) {
   void arrFlash.offsetWidth;
   arrFlash.style.animation='';
 
-  // mergeArea
+  // mergeArea（アニメなし・即時表示）
   document.getElementById('mergeArea').style.animation='none';
-  void document.getElementById('mergeArea').offsetWidth;
-  document.getElementById('mergeArea').style.animation='';
+  document.getElementById('mergeArea').style.opacity='1';
 
   celebOverlay.classList.add('active');
   startCelebBgCanvas();
@@ -6429,16 +6379,16 @@ function _showCelebrationImpl(isSecretClear, withFanfare) {
     }
   }
 
-  // タイムライン：裏ミッションクリアは通常カラー紙吹雪、通常クリアは金・銀紙吹雪
+  // 紙吹雪：即時開始
   if(isSecretClear){
-    setTimeout(()=>spawnConfetti(100), 3900);
-    setTimeout(()=>spawnConfetti(60),  4700);
+    spawnConfetti(100);
+    setTimeout(()=>spawnConfetti(60),  800);
   } else {
-    setTimeout(()=>spawnConfettiGoldSilver(100), 3900);
-    setTimeout(()=>spawnConfettiGoldSilver(60),  4700);
+    spawnConfettiGoldSilver(100);
+    setTimeout(()=>spawnConfettiGoldSilver(60),  800);
   }
-  setTimeout(()=>spawnSparkles(20),  4000);
-  setTimeout(()=>spawnSparkles(14),  5200);
+  spawnSparkles(20);
+  setTimeout(()=>spawnSparkles(14),  1200);
 }
 
 function hideCelebration() {
@@ -6627,7 +6577,7 @@ document.getElementById('secretMissionBtn').addEventListener('click', (e) => {
       oc.width = RW; oc.height = RH;
       const c2 = oc.getContext('2d');
       c2.imageSmoothingEnabled = true;
-      c2.imageSmoothingQuality = 'high';
+      c2.imageSmoothingQuality = 'medium';
       c2.drawImage(src, 0, 0, RW, RH);
       goldenCanvas = oc;
       return oc;
@@ -6787,7 +6737,7 @@ document.getElementById('secretMissionBtn').addEventListener('click', (e) => {
         const srcImg = rocketImg.complete && rocketImg.naturalWidth ? rocketImg : null;
         if (srcImg) {
           gc.globalAlpha = rocketAlpha * (showGolden ? (1-goldReveal) : 1) * (1-fogCoverAlpha*0.85);
-          gc.imageSmoothingEnabled = true; gc.imageSmoothingQuality = 'high';
+          gc.imageSmoothingEnabled = true; gc.imageSmoothingQuality = 'medium';
           // 軽いシマー（霧フェーズ）
           if (fogDensity > 0.3 && !showGolden) {
             gc.shadowColor = 'rgba(120,200,255,0.8)';
@@ -6802,7 +6752,7 @@ document.getElementById('secretMissionBtn').addEventListener('click', (e) => {
         const goldenOC = buildGoldenRocket();
         if (goldenOC) {
           gc.globalAlpha = rocketAlpha * goldReveal;
-          gc.imageSmoothingEnabled = true; gc.imageSmoothingQuality = 'high';
+          gc.imageSmoothingEnabled = true; gc.imageSmoothingQuality = 'medium';
           // ゴールドグロー
           gc.shadowColor = `rgba(255,200,0,${goldReveal})`;
           gc.shadowBlur  = 32 * goldReveal;

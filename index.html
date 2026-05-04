@@ -1883,11 +1883,18 @@ function drawBlackhole(bh) {
     ctx.drawImage(blackholeImg, -drawR, -drawR, drawR * 2, drawR * 2);
     ctx.restore();
 
-    // ── 画像の透明（穴）部分を覆う黒い円
+    // ── 画像の透明（穴）部分を覆う黒い円（透明穴より少し大きく・縁ぼかし）
     ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,1)';
+    // ぼかし幅（穴半径の約15%）：中心は完全な黒、外縁に向けてフェードアウト
+    const holeR  = r * 1.05;  // 透明穴より少し大きい
+    const blurW  = r * 0.15;  // ぼかし幅
+    const hg = ctx.createRadialGradient(cx, cy, Math.max(0, holeR - blurW), cx, cy, holeR + blurW * 0.5);
+    hg.addColorStop(0,   'rgba(0,0,0,1)');
+    hg.addColorStop(0.7, 'rgba(0,0,0,0.85)');
+    hg.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.fillStyle = hg;
     ctx.beginPath();
-    ctx.arc(cx, cy, r * 0.88, 0, Math.PI * 2);
+    ctx.arc(cx, cy, holeR + blurW * 0.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   } else {
@@ -1919,8 +1926,14 @@ function drawSuckingObjects(){
         ctx.beginPath(); ctx.arc(0,0,s.origR,0,Math.PI*2); ctx.fill();
       }
     } else if(s.type === 'rocket'){
-      if(rocketImg.complete && rocketImg.naturalWidth > 0){
-        ctx.drawImage(rocketImg, -29, -61, 58, 95);
+      const _r3ok = rocket3Img.complete && rocket3Img.naturalWidth > 0;
+      const _r2ok = rocket2Img.complete && rocket2Img.naturalWidth > 0;
+      const _r1ok = rocketImg.complete && rocketImg.naturalWidth > 0;
+      const _mapRocket = (secretCleared && _r3ok) ? rocket3Img
+                       : ((completedCount >= 7) && _r2ok) ? rocket2Img
+                       : _r1ok ? rocketImg : null;
+      if(_mapRocket){
+        ctx.drawImage(_mapRocket, -29, -61, 58, 95);
       } else {
         ctx.fillStyle = '#dde8f0'; ctx.fillRect(-13,-36,26,56);
       }
@@ -2723,14 +2736,15 @@ function drawRocketAt(cx,cy,showFlame,tilt){
   ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality = 'medium';
 
   // secretClearedフラグがあればrocket3.webpを使用（全ミッション対応）
-  // ミッション8（裏ミッション）はrocket3（またはrocket2）を使用
+  // エキスパートクリア済み（completedCount>=7）はrocket2.webpを使用（全ミッション対応）
   const isSecret = st() && st().isSecret;
   const rocket3Ready = rocket3Img.complete && rocket3Img.naturalWidth > 0;
   const rocket2Ready = rocket2Img.complete && rocket2Img.naturalWidth > 0;
   const rocket1Ready = rocketImg.complete && rocketImg.naturalWidth > 0;
-  const useImg = (secretCleared && rocket3Ready) ? rocket3Img
-               : (isSecret && rocket2Ready) ? rocket2Img
-               : rocket1Ready ? rocketImg : null;
+  const expertCleared = completedCount >= 7;
+  const useImg = (secretCleared && rocket3Ready)             ? rocket3Img
+               : ((isSecret || expertCleared) && rocket2Ready) ? rocket2Img
+               : rocket1Ready                                  ? rocketImg : null;
 
   if(useImg){
     // 【修正①】常に同一サイズ(-29,-61,58,95)で描画。rocket2もrocket1と全く同じ太さ。
@@ -5364,7 +5378,8 @@ function startStage(idx){
   // ステージ開始時はエネルギーを全回復
   energy=ENERGY_MAX;
   life=LIFE_MAX;
-
+  // ループタイマーをリセット（前フレームとの差分が巨大にならないよう）
+  lastTime = performance.now();
 }
 
 function startGame(){
@@ -6524,6 +6539,8 @@ document.addEventListener('visibilitychange', () => {
   } else {
     // --- フォアグラウンド: ゲームを再開 ---
     _pausedByVisibility = false;
+    // 一時停止中に積み上がったelapsedをリセット（巨大なdtでゲームが一瞬止まるのを防ぐ）
+    lastTime = performance.now();
 
     // BGM再開（stopBgm()後はcurrentBgmFile===nullなので再開しない）
     if (_bgmWasPlaying && _bgmWasFile && currentBgmFile === _bgmWasFile) {

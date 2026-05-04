@@ -434,9 +434,7 @@ html, body {
 }
 
 #celebSub {
-  margin-top: 8px;
-  font-size: 12px; color: rgba(200,230,255,0.95);
-  text-align: center; letter-spacing: 1px; line-height: 1.7;
+  display: none;
 }
 
 #celebClose {
@@ -584,9 +582,7 @@ html, body {
 }
 
 #licensedCelebSub {
-  margin-top: 8px;
-  font-size: 12px; color: rgba(200,230,255,0.95);
-  text-align: center; letter-spacing: 1px; line-height: 1.7;
+  display: none;
 }
 
 #licensedCelebToStart {
@@ -694,7 +690,7 @@ html, body {
     <div id="licensedMergeFlash"></div>
     <div id="licensedMergeFlash2"></div>
   </div>
-  <div id="licensedCelebTitle">🏅 ライセンス取得！ 🏅<br><span style="font-size:13px;letter-spacing:1px;font-weight:700;opacity:0.85">ミッション1-6を制覇</span></div>
+  <div id="licensedCelebTitle">🏅 ライセンス取得！ 🏅<br><span style="font-size:13px;letter-spacing:1px;font-weight:700;opacity:0.85">基本ミッションをクリア</span></div>
   <div id="licensedCelebSub">地球から太陽系の縁へ——<br>あなたに心音の免許皆伝！</div>
   <button id="licensedCelebToStart">スタートページに戻る</button>
   <button id="licensedCelebClose">最終ミッションに挑戦</button>
@@ -725,12 +721,24 @@ html, body {
     <div id="mergeFlash2"></div>
   </div>
 
-  <div id="celebTitle">🌟 心臓星 到達！ 🌟<br><span style="font-size:13px;letter-spacing:1px;font-weight:700;opacity:0.85">全ミッション完全制覇</span></div>
+  <div id="celebTitle">🌟 エキスパート獲得 🌟<br><span style="font-size:13px;letter-spacing:1px;font-weight:700;opacity:0.85">全ミッションを完全制覇</span></div>
   <div id="celebSub">地球から遥かな航路を越えて——<br>あなたは心音のエキスパートだ！</div>
   <button id="celebClose">スタートページに戻る</button>
-  <button id="secretMissionBtn">いざ挑戦：地球に帰還</button>
-  <button id="celebMission1Btn" style="display:none;">ミッション1を始める</button>
-</div>
+  <button id="secretMissionBtn">裏ミッション：地球へ</button>
+  <button id="celebMission1Btn" style="display:none;">ミッション1から再開</button>
+  <!-- ロケット進化イラスト（エキスパート：rocket→rocket2、マイスター：rocket→rocket3） -->
+  <div id="rocketEvolution" style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;padding:10px 0;">
+    <div style="display:flex;flex-direction:column;align-items:center;">
+      <canvas id="rocketEvoFrom" width="40" height="66" style="width:40px;height:66px;image-rendering:auto;"></canvas>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;">
+      <span style="font-size:18px;color:rgba(255,220,80,0.9);">→</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;">
+      <canvas id="rocketEvoTo" width="40" height="66" style="width:40px;height:66px;image-rendering:auto;"></canvas>
+    </div>
+  </div>
+</div><!-- /#celebrationOverlay -->
 </div><!-- /#rwrap -->
 </div><!-- /#rw -->
 
@@ -3143,10 +3151,10 @@ function drawStartScreen() {
 
     // ── 左上：勲章エリア（常に3枚表示・未取得は暗く・航路マップ風の枠付き）──
     {
-      const MEDAL_H   = 22;
-      const MEDAL_GAP = 6;
-      const PAD_X     = 6;
-      const PAD_Y     = 5;
+      const MEDAL_H   = 30;
+      const MEDAL_GAP = 7;
+      const PAD_X     = 7;
+      const PAD_Y     = 6;
       const FRAME_X   = MARGIN;
       const FRAME_Y   = 3;
       const FRAME_R   = 6;
@@ -4517,12 +4525,6 @@ function loop(ts){
 
   // バックグラウンド中はゲームを進行しない（描画もスキップ）
   if (_pausedByVisibility) {
-    requestAnimationFrame(loop);
-    return;
-  }
-
-  // 金色変換アニメ中はゲームループを止める（オーバーレイが全画面を占有）
-  if(state === 'golden_transform'){
     requestAnimationFrame(loop);
     return;
   }
@@ -6289,6 +6291,41 @@ function showCelebrationNoFanfare() {
   _showCelebrationImpl(false, false);
 }
 
+// ロケット進化イラストをcanvasに描画
+function drawRocketEvolution(isSecretClear) {
+  const fromCanvas = document.getElementById('rocketEvoFrom');
+  const toCanvas   = document.getElementById('rocketEvoTo');
+  if (!fromCanvas || !toCanvas) return;
+
+  // エキスパート: rocket→rocket2、マイスター: rocket2→rocket3
+  const fromImg = isSecretClear ? rocket2Img : rocketImg;
+  const toImg   = isSecretClear ? rocket3Img : rocket2Img;
+
+  function drawOnCanvas(canvas, img) {
+    const c = canvas.getContext('2d');
+    c.clearRect(0, 0, canvas.width, canvas.height);
+    if (img && img.complete && img.naturalWidth > 0) {
+      const scale = Math.min(canvas.width / img.naturalWidth, canvas.height / img.naturalHeight);
+      const dw = img.naturalWidth * scale;
+      const dh = img.naturalHeight * scale;
+      const dx = (canvas.width - dw) / 2;
+      const dy = (canvas.height - dh) / 2;
+      c.drawImage(img, dx, dy, dw, dh);
+    }
+  }
+
+  function tryDraw(img, canvas) {
+    if (img.complete && img.naturalWidth > 0) {
+      drawOnCanvas(canvas, img);
+    } else {
+      img.addEventListener('load', () => drawOnCanvas(canvas, img), { once: true });
+    }
+  }
+
+  tryDraw(fromImg, fromCanvas);
+  tryDraw(toImg,   toCanvas);
+}
+
 function _showCelebrationImpl(isSecretClear, withFanfare) {
 
   // 心音・BGMを確実に停止
@@ -6304,7 +6341,7 @@ function _showCelebrationImpl(isSecretClear, withFanfare) {
   const subEl   = document.getElementById('celebSub');
   const secretBtn = document.getElementById('secretMissionBtn');
   if(isSecretClear){
-    titleEl.innerHTML = '🌍 地球に帰還！ 🌍<br><span style="font-size:13px;letter-spacing:1px;font-weight:700;opacity:0.85">裏ミッション無事完遂</span>';
+    titleEl.innerHTML = '🌍 マイスター認定！ 🌍<br><span style="font-size:13px;letter-spacing:1px;font-weight:700;opacity:0.85">全ミッションを完遂</span>';
     subEl.innerHTML   = '心臓星から長い航路を経て——<br>あなたは心音のマイスターだ！';
     secretBtn.style.display = 'none';
     document.getElementById('celebMission1Btn').style.display = '';
@@ -6326,7 +6363,7 @@ function _showCelebrationImpl(isSecretClear, withFanfare) {
     secretCleared = true;
     try { localStorage.setItem('shinon_secretCleared', '1'); } catch(e) {}
   } else {
-    titleEl.innerHTML = '🌟 心臓星 到達！ 🌟<br><span style="font-size:13px;letter-spacing:1px;font-weight:700;opacity:0.85">全ミッション完全制覇</span>';
+    titleEl.innerHTML = '🌟 エキスパート獲得！ 🌟<br><span style="font-size:13px;letter-spacing:1px;font-weight:700;opacity:0.85">応用ミッションをクリア</span>';
     subEl.innerHTML   = '地球から遥かな航路を越えて——<br>あなたは心音のエキスパートだ！';
     secretBtn.style.display = '';
     document.getElementById('celebMission1Btn').style.display = 'none';
@@ -6348,6 +6385,9 @@ function _showCelebrationImpl(isSecretClear, withFanfare) {
     if(completedCount < 7) completedCount = 7;
     try { localStorage.setItem('shinon_completedCount', String(completedCount)); } catch(e) {}
   }
+
+  // ロケット進化イラストを描画（エキスパート・マイスター共通）
+  drawRocketEvolution(isSecretClear);
 
   // 旅の回想ベルト構築
   buildJourneyTrail();
@@ -6427,421 +6467,22 @@ document.getElementById('celebMission1Btn').addEventListener('click', (e) => {
   startFromMap(0);
 });
 
-// 裏ミッションボタン
+// 裏ミッションボタン（変身アニメ削除・直接開始）
 document.getElementById('secretMissionBtn').addEventListener('click', (e) => {
   e.stopPropagation();
   unlockAudio();
   hideCelebration();
 
   document.getElementById('startBtn').classList.add('hidden');
-  const _hpwForTransform = document.getElementById('heartPlanetWrap');
-  if(_hpwForTransform) _hpwForTransform.style.display = 'none';
+  const hpw = document.getElementById('heartPlanetWrap');
+  if(hpw) hpw.style.display = 'none';
 
-  // 裏ミッションクリア済みの場合はアニメをスキップして直接開始
-  if (secretCleared) {
-    state = 'launch_anim';
-    ctx.clearRect(0, 0, W, H);
-    _triggerLaunchAudio();
-    startStage(7);
-    return;
-  }
-
-  // 【修正②】金色変換アニメ中はstartBtnを非表示にする
-  const _heartPlanet = document.getElementById('heartPlanet');
-  if(_heartPlanet) _heartPlanet.style.display = 'none';
-  const _orbitPath = document.getElementById('orbitPath');
-  if(_orbitPath) _orbitPath.style.display = 'none';
-
-  // ゲームループの干渉を防ぐ
-  state = 'golden_transform';
+  state = 'launch_anim';
   ctx.clearRect(0, 0, W, H);
-
-  // ===== 金色ロケット変換アニメ（超ドラマチック版） =====
-  // フェーズ：
-  //   0.00-0.15  : ロケット(rocket.webp)が画面中央に降下・登場
-  //   0.15-0.38  : 青白い霧/もやがロケットを包んでいく
-  //   0.38-0.58  : 霧が最高濃度・ロケットが霧に飲み込まれる（完全に隠れる）
-  //   0.58-0.72  : 霧の中で衝撃波・光・変換エフェクト爆発
-  //   0.72-0.86  : 霧が晴れていく → 金色ロケット(rocket2.webp)が現れる
-  //   0.86-1.00  : 金色ロケット全開放・輝き・テキスト → フェードアウト
-  (function playGoldenTransform() {
-    const overlay = document.getElementById('goldenTransformOverlay');
-    const gtCanvas = document.getElementById('goldenTransformCanvas');
-    const rwrap = document.getElementById('rwrap');
-    const dw = parseInt(rwrap.style.width) || 320;
-    const dh = parseInt(rwrap.style.height) || 520;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-
-    gtCanvas.width  = dw * dpr;
-    gtCanvas.height = dh * dpr;
-    gtCanvas.style.width  = dw + 'px';
-    gtCanvas.style.height = dh + 'px';
-    const gc = gtCanvas.getContext('2d');
-    gc.scale(dpr, dpr);
-
-    overlay.classList.add('active');
-
-    const CW = dw, CH = dh;
-    const cx = CW / 2;
-    const cy = CH * 0.45;  // 画面の少し上寄り中央
-
-    // 【修正③】ロケット描画サイズ：進化前と全く同じサイズ(58×95)で2倍スケール
-    // RYを-RH/2にして画像の中心がtranslate点(cy)に来るよう修正
-    const BASE_SCALE = 2.0;
-    const RW = 58 * BASE_SCALE, RH = 95 * BASE_SCALE;
-    const RX = -RW/2, RY = -RH/2; // 【修正③】中心揃え
-
-    let startT = null;
-    const TOTAL_DUR = 10000; // ms（金色ロケット表示時間をさらに延長）
-
-    // ── パーティクルシステム ──
-    const fogParticles  = [];
-    const goldParticles = [];
-    const shockRings    = [];
-    const starSparkles  = [];
-    const energySparks  = [];
-
-    function spawnFog(count, baseR, color, spread, vy_bias) {
-      for (let i = 0; i < count; i++) {
-        const angle = Math.random()*Math.PI*2;
-        const dist  = Math.random()*spread;
-        fogParticles.push({
-          x: cx + Math.cos(angle)*dist,
-          y: cy + Math.sin(angle)*dist,
-          vx: (Math.random()-0.5)*0.6,
-          vy: (Math.random()-0.5)*0.5 + (vy_bias||0),
-          r: baseR + Math.random()*baseR*1.8,
-          life: 1.0,
-          decayRate: 0.008 + Math.random()*0.006,
-          color,
-        });
-      }
-    }
-
-    function spawnGoldBurst() {
-      for (let i = 0; i < 40; i++) {
-        const angle = Math.random()*Math.PI*2;
-        const spd   = 2.0 + Math.random()*6.0;
-        goldParticles.push({
-          x: cx, y: cy,
-          vx: Math.cos(angle)*spd, vy: Math.sin(angle)*spd - 1.5,
-          life: 1.0, r: 2+Math.random()*4,
-          color: ['#ffd700','#fff8a0','#ffcc00','#ffffff','#ffaa00'][Math.floor(Math.random()*5)],
-        });
-      }
-      // エネルギースパーク（長い線）
-      for (let i = 0; i < 18; i++) {
-        const angle = (i/18)*Math.PI*2;
-        const spd   = 4+Math.random()*8;
-        energySparks.push({
-          x: cx, y: cy,
-          vx: Math.cos(angle)*spd, vy: Math.sin(angle)*spd,
-          len: 20+Math.random()*40,
-          life: 1.0, decay: 0.035+Math.random()*0.02,
-          color: i%2===0 ? '#ffe840' : '#ffffff',
-        });
-      }
-      // 衝撃波リング
-      shockRings.push({ r: 5, life: 1.0, maxR: CW*0.7, color: 'rgba(255,240,80,' });
-      shockRings.push({ r: 5, life: 1.0, maxR: CW*0.5, color: 'rgba(255,255,200,' });
-      setTimeout(() => shockRings.push({ r: 5, life: 1.0, maxR: CW*0.6, color: 'rgba(255,180,40,' }), 180);
-    }
-
-    function drawStar4(x, y, size, rot, alpha) {
-      gc.save(); gc.globalAlpha = alpha;
-      gc.translate(x, y); gc.rotate(rot);
-      gc.fillStyle = '#fffaaa'; gc.shadowColor = '#ffd700'; gc.shadowBlur = 8;
-      gc.beginPath();
-      for (let i = 0; i < 4; i++) {
-        const a = (i/4)*Math.PI*2;
-        const a1 = a + Math.PI/4;
-        const r0 = size, r1 = size*0.18;
-        i===0 ? gc.moveTo(Math.cos(a)*r0, Math.sin(a)*r0)
-              : gc.lineTo(Math.cos(a)*r0, Math.sin(a)*r0);
-        gc.lineTo(Math.cos(a1)*r1, Math.sin(a1)*r1);
-      }
-      gc.closePath(); gc.fill(); gc.restore();
-    }
-
-    // 【修正④⑤】金色ロケット（rocket2.webp）のキャッシュ
-    // rocket2.webpは背景無色ファイルなのでmultiply合成せず、そのまま描画する
-    // （multiply合成すると黒背景のように金色になってしまうため削除）
-    let goldenCanvas = null;
-    function buildGoldenRocket() {
-      if (goldenCanvas) return goldenCanvas;
-      // rocket2が読み込み済みならそのまま使う、なければrocket1を使う
-      const src = (rocket2Img.complete && rocket2Img.naturalWidth) ? rocket2Img : rocketImg;
-      if (!src.complete || !src.naturalWidth) return null;
-      // オフスクリーンCanvasにそのまま描画（色変更なし）
-      const oc = document.createElement('canvas');
-      oc.width = RW; oc.height = RH;
-      const c2 = oc.getContext('2d');
-      c2.imageSmoothingEnabled = true;
-      c2.imageSmoothingQuality = 'medium';
-      c2.drawImage(src, 0, 0, RW, RH);
-      goldenCanvas = oc;
-      return oc;
-    }
-
-    let burstFired = false;
-    let fogDensity = 0;
-    let sparkleTimer = 0;
-    let lastT = 0;
-
-    function frame(ts) {
-      if (!startT) startT = ts;
-      const elapsed = ts - startT;
-      const t = Math.min(1, elapsed / TOTAL_DUR);
-      const rawDt = (ts - (startT + lastT * TOTAL_DUR)) / 1000;
-      lastT = t;
-
-      gc.clearRect(0, 0, CW, CH);
-
-      // ── 背景：宇宙（暗→ミドル） ──
-      const bgG = gc.createRadialGradient(cx, cy, 0, cx, cy, CW);
-      bgG.addColorStop(0,   'rgba(10,5,25,1)');
-      bgG.addColorStop(0.5, 'rgba(4,2,12,1)');
-      bgG.addColorStop(1,   'rgba(0,0,5,1)');
-      gc.fillStyle = bgG;
-      gc.fillRect(0, 0, CW, CH);
-
-      // 背景の星
-      const now = ts;
-      for (let i = 0; i < 80; i++) {
-        const sx = (Math.sin(i*137.5+0.1)*0.5+0.5)*CW;
-        const sy = (Math.sin(i*97.3+0.3)*0.5+0.5)*CH;
-        const sa = 0.3 + 0.4*Math.abs(Math.sin(now*0.001*((i%5)*0.3+0.8)+i));
-        gc.save(); gc.globalAlpha = sa;
-        gc.fillStyle = '#ffffff';
-        gc.beginPath(); gc.arc(sx, sy, 0.5+Math.sin(i)*0.3, 0, Math.PI*2); gc.fill();
-        gc.restore();
-      }
-
-      // ── Phase 1 (0.00-0.15): ロケット登場 ──
-      const p1 = Math.min(1, t / 0.15);
-      const easeP1 = 1 - Math.pow(1-p1, 3);
-      const entryY = CH + 120 - (CH + 120 - cy) * easeP1;
-      const rocketAlpha = Math.min(1, p1 * 4);
-
-      // ── 霧密度制御 ──
-      if      (t < 0.15) fogDensity = 0;
-      else if (t < 0.38) fogDensity = (t - 0.15) / 0.23;
-      else if (t < 0.58) fogDensity = 1.0;
-      else if (t < 0.72) fogDensity = 1.0 - (t - 0.58) / 0.14 * 0.8;  // 少し残す
-      else if (t < 0.86) fogDensity = 0.2 * (1 - (t-0.72)/0.14);
-      else               fogDensity = 0;
-
-      // 霧スポーン
-      if (t > 0.13 && t < 0.86 && Math.random() < fogDensity * 0.5 + 0.04) {
-        const isGold = t > 0.58;
-        const col = isGold
-          ? `rgba(255,${Math.round(180+fogDensity*60)},40,`
-          : `rgba(160,200,255,`;
-        spawnFog(1, 25 + fogDensity*30, col, 55 + fogDensity*55, -0.1);
-      }
-
-      // 霧パーティクル更新・描画
-      for (let i = fogParticles.length-1; i >= 0; i--) {
-        const fp = fogParticles[i];
-        fp.x += fp.vx; fp.y += fp.vy;
-        fp.life -= fp.decayRate;
-        if (fp.life <= 0) { fogParticles.splice(i,1); continue; }
-        const la = fogDensity * fp.life * 0.38;
-        gc.save(); gc.globalAlpha = la;
-        const rg = gc.createRadialGradient(fp.x, fp.y, 0, fp.x, fp.y, fp.r);
-        rg.addColorStop(0, fp.color + '0.6)');
-        rg.addColorStop(0.5, fp.color + '0.3)');
-        rg.addColorStop(1, fp.color + '0)');
-        gc.fillStyle = rg;
-        gc.beginPath(); gc.arc(fp.x, fp.y, fp.r*(0.4+fp.life*0.6), 0, Math.PI*2); gc.fill();
-        gc.restore();
-      }
-
-      // ── Phase 変換爆発 (0.58) ──
-      if (t >= 0.58 && !burstFired) {
-        burstFired = true;
-        spawnGoldBurst();
-      }
-
-      // 衝撃波
-      for (let i = shockRings.length-1; i >= 0; i--) {
-        const sr = shockRings[i];
-        sr.r += sr.maxR * 0.04;
-        sr.life -= 0.04;
-        if (sr.r > sr.maxR || sr.life <= 0) { shockRings.splice(i,1); continue; }
-        const prog = sr.r / sr.maxR;
-        gc.save();
-        gc.strokeStyle = `${sr.color}${sr.life * 0.9})`;
-        gc.lineWidth = Math.max(1, (1-prog) * 8);
-        gc.shadowColor = 'rgba(255,220,0,1)'; gc.shadowBlur = 12;
-        gc.beginPath(); gc.arc(cx, cy, sr.r, 0, Math.PI*2); gc.stroke();
-        gc.restore();
-      }
-
-      // エネルギースパーク
-      for (let i = energySparks.length-1; i >= 0; i--) {
-        const es = energySparks[i];
-        es.x += es.vx; es.y += es.vy;
-        es.vx *= 0.94; es.vy *= 0.94;
-        es.life -= es.decay;
-        if (es.life <= 0) { energySparks.splice(i,1); continue; }
-        gc.save(); gc.globalAlpha = es.life;
-        gc.strokeStyle = es.color; gc.lineWidth = es.life * 2;
-        gc.shadowColor = '#ffd700'; gc.shadowBlur = 6;
-        gc.beginPath();
-        gc.moveTo(es.x, es.y);
-        gc.lineTo(es.x - es.vx * es.len * 0.08, es.y - es.vy * es.len * 0.08);
-        gc.stroke(); gc.restore();
-      }
-
-      // 金色パーティクル
-      for (let i = goldParticles.length-1; i >= 0; i--) {
-        const p = goldParticles[i];
-        p.x += p.vx; p.y += p.vy; p.vy += 0.05;
-        p.vx *= 0.97; p.vy *= 0.97;
-        p.life -= 0.022;
-        if (p.life <= 0) { goldParticles.splice(i,1); continue; }
-        gc.save(); gc.globalAlpha = p.life * 0.9;
-        gc.shadowColor = '#ffd700'; gc.shadowBlur = 8;
-        gc.fillStyle = p.color;
-        gc.beginPath(); gc.arc(p.x, p.y, p.r*p.life, 0, Math.PI*2); gc.fill();
-        gc.restore();
-      }
-
-      // きらきら★（Phase4以降）
-      sparkleTimer += 16;
-      if (t >= 0.72 && t < 0.97 && sparkleTimer > 100+Math.random()*120) {
-        sparkleTimer = 0;
-        const a = Math.random()*Math.PI*2;
-        const d = 35+Math.random()*75;
-        starSparkles.push({ x:cx+Math.cos(a)*d, y:cy+Math.sin(a)*d*0.7, life:1.0, size:5+Math.random()*9, rot:Math.random()*Math.PI, rotV:(Math.random()-0.5)*0.18 });
-      }
-      for (let i = starSparkles.length-1; i >= 0; i--) {
-        const s = starSparkles[i];
-        s.life -= 0.03; s.rot += s.rotV;
-        if (s.life <= 0) { starSparkles.splice(i,1); continue; }
-        drawStar4(s.x, s.y, s.size*s.life, s.rot, s.life*0.95);
-      }
-
-      // ── ロケット描画 ──
-      gc.save();
-      gc.translate(cx, entryY);
-
-      const showGolden   = t >= 0.72;
-      const goldReveal   = t >= 0.72 ? Math.min(1, (t - 0.72) / 0.16) : 0;
-      const fogCoverAlpha = t >= 0.38 && t < 0.86
-        ? Math.min(1, fogDensity * 1.5) : 0;
-
-      // 通常ロケット（rocket.webp）- 変換前
-      if (!showGolden || goldReveal < 1) {
-        const srcImg = rocketImg.complete && rocketImg.naturalWidth ? rocketImg : null;
-        if (srcImg) {
-          gc.globalAlpha = rocketAlpha * (showGolden ? (1-goldReveal) : 1) * (1-fogCoverAlpha*0.85);
-          gc.imageSmoothingEnabled = true; gc.imageSmoothingQuality = 'medium';
-          // 軽いシマー（霧フェーズ）
-          if (fogDensity > 0.3 && !showGolden) {
-            gc.shadowColor = 'rgba(120,200,255,0.8)';
-            gc.shadowBlur  = 16 * fogDensity;
-          }
-          gc.drawImage(srcImg, RX, RY, RW, RH);
-        }
-      }
-
-      // 金色ロケット（rocket2.webp）- 変換後
-      if (showGolden) {
-        const goldenOC = buildGoldenRocket();
-        if (goldenOC) {
-          gc.globalAlpha = rocketAlpha * goldReveal;
-          gc.imageSmoothingEnabled = true; gc.imageSmoothingQuality = 'medium';
-          // ゴールドグロー
-          gc.shadowColor = `rgba(255,200,0,${goldReveal})`;
-          gc.shadowBlur  = 32 * goldReveal;
-          gc.drawImage(goldenOC, RX, RY, RW, RH);
-          // 追加グロー（2重）
-          gc.save();
-          gc.shadowColor = 'rgba(255,240,100,0.8)';
-          gc.shadowBlur  = 18 * goldReveal;
-          gc.globalAlpha = rocketAlpha * goldReveal * 0.4;
-          const src2 = rocket2Img.complete && rocket2Img.naturalWidth ? rocket2Img : rocketImg;
-          gc.drawImage(src2, RX, RY, RW, RH);
-          gc.restore();
-        }
-      }
-      gc.restore();
-
-      // 変換フラッシュ（t≈0.58）- shadowをリセットしてから描画（金色四角形バグ防止）
-      if (t >= 0.55 && t < 0.68) {
-        const ft = (t - 0.55) / 0.13;
-        const fa = Math.sin(ft * Math.PI) * 0.85;
-        gc.save();
-        gc.shadowBlur = 0; gc.shadowColor = 'transparent';
-        gc.fillStyle = `rgba(255,240,120,${fa})`;
-        gc.fillRect(0, 0, CW, CH);
-        gc.restore();
-      }
-
-      // ── テキスト ──
-      gc.save();
-      gc.textAlign = 'center';
-      // 「進化中...」霧フェーズ
-      if (t >= 0.20 && t < 0.62) {
-        const ta = Math.min(1,(t-0.20)/0.10) * (1-Math.max(0,(t-0.54)/0.08));
-        gc.globalAlpha = ta;
-        gc.font = "bold 13px -apple-system,'Hiragino Sans',sans-serif";
-        gc.shadowColor = 'rgba(120,200,255,0.9)'; gc.shadowBlur = 12;
-        gc.fillStyle = 'rgba(200,235,255,0.95)';
-        gc.fillText('✦ 進化中... ✦', cx, cy + RY - 30);
-      }
-      // 「GOLDEN ROCKET」- 金色ロケット表示中（t=0.74〜0.97）に表示（長めに）
-      if (t >= 0.74 && t < 0.97) {
-        const ta = Math.min(1,(t-0.74)/0.06) * (1-Math.max(0,(t-0.93)/0.04));
-        gc.globalAlpha = ta;
-        gc.font = `bold ${Math.round(CW*0.054)}px -apple-system,'Hiragino Sans',sans-serif`;
-        gc.shadowColor = 'rgba(255,180,0,1)'; gc.shadowBlur = 24;
-        const tg = gc.createLinearGradient(cx-90, 0, cx+90, 0);
-        tg.addColorStop(0, '#ffe066'); tg.addColorStop(0.45, '#ffffff'); tg.addColorStop(1, '#ffcc00');
-        gc.fillStyle = tg;
-        gc.fillText('✦ GOLDEN ROCKET ✦', cx, cy + RY - 32);
-        gc.shadowBlur = 0;
-        gc.font = `bold ${Math.round(CW*0.034)}px -apple-system,'Hiragino Sans',sans-serif`;
-        gc.fillStyle = `rgba(255,220,100,${ta})`;
-        gc.fillText('地球へ帰還せよ', cx, cy + RY - 14);
-      }
-      gc.restore();
-
-      // ── 終了フェードアウト（t=0.96〜1.0）──
-      if (t > 0.96) {
-        const fa = (t - 0.96) / 0.04;
-        gc.save();
-        gc.shadowBlur = 0;
-        gc.fillStyle = `rgba(0,3,12,${fa})`;
-        gc.fillRect(0, 0, CW, CH);
-        gc.restore();
-      }
-
-      if (t < 1.0) {
-        requestAnimationFrame(frame);
-      } else {
-        overlay.classList.remove('active');
-        gc.clearRect(0, 0, CW, CH);
-        stageIdx = 7;
-        state = 'launch_anim'; // golden_transformを解除してからstartStageへ
-        document.getElementById('startBtn').classList.add('hidden');
-        // 修正②で隠したheartPlanet/orbitPathを元に戻す（startStageが上書きするので問題なし）
-        const _hp2 = document.getElementById('heartPlanet');
-        if(_hp2) _hp2.style.display = '';
-        const _op2 = document.getElementById('orbitPath');
-        if(_op2) _op2.style.display = '';
-        const hpw = document.getElementById('heartPlanetWrap');
-        if(hpw) hpw.style.display = 'none';
-        // 【修正⑥】ミッション8開始時に発射音を鳴らす
-        _triggerLaunchAudio();
-        startStage(7);
-      }
-    }
-    requestAnimationFrame(frame);
-  })();
+  _triggerLaunchAudio();
+  startStage(7);
 });
+
 
 // =============================
 // 全クリア時にお祝い表示を呼ぶ

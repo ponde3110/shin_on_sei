@@ -2915,20 +2915,30 @@ function drawHUD(){
     const t = Date.now() * 0.003;
     const pulse = 0.55 + 0.35 * Math.abs(Math.sin(t)); // 強めの点滅
 
-    // 左ボタン（枠なし・小さめ）
+    // 左ボタン（マウス押下中は明るく）
+    const leftActive  = keys['ArrowLeft'];
+    const rightActive = keys['ArrowRight'];
     ctx.save();
-    ctx.globalAlpha = pulse;
-    ctx.fillStyle = '#ffffff';
+    ctx.globalAlpha = leftActive ? 1.0 : pulse;
+    if (leftActive) {
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      ctx.beginPath(); ctx.roundRect(2, arrowY - 14, 36, 28, 6); ctx.fill();
+    }
+    ctx.fillStyle = leftActive ? '#88ddff' : '#ffffff';
     ctx.font = "bold 16px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('◀', 13, arrowY);
     ctx.restore();
 
-    // 右ボタン（枠なし・小さめ）
+    // 右ボタン（マウス押下中は明るく）
     ctx.save();
-    ctx.globalAlpha = pulse;
-    ctx.fillStyle = '#ffffff';
+    ctx.globalAlpha = rightActive ? 1.0 : pulse;
+    if (rightActive) {
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      ctx.beginPath(); ctx.roundRect(W - 38, arrowY - 14, 36, 28, 6); ctx.fill();
+    }
+    ctx.fillStyle = rightActive ? '#88ddff' : '#ffffff';
     ctx.font = "bold 16px -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif";
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -5805,6 +5815,69 @@ document.addEventListener('touchend', (e) => {
 }, { passive: true });
 
 // --- ここまで追記 ---
+
+// ===========================
+// PCマウスによる矢印ボタン操作
+// ===========================
+// 矢印ボタンの当たり判定（canvas論理座標）
+// 左矢印：x=0〜40, 右矢印：x=W-40〜W
+// y は画面下部（H-130〜H-50）の広めの範囲
+const ARROW_BTN_W = 40;
+const ARROW_BTN_Y_TOP = H - 130;
+const ARROW_BTN_Y_BTM = H - 50;
+
+function _getMouseArrowSide(clientX, clientY) {
+  const rect = cv.getBoundingClientRect();
+  const mx = (clientX - rect.left) * (W / rect.width);
+  const my = (clientY - rect.top)  * (H / rect.height);
+  if (my < ARROW_BTN_Y_TOP || my > ARROW_BTN_Y_BTM) return null;
+  if (mx >= 0 && mx <= ARROW_BTN_W) return 'left';
+  if (mx >= W - ARROW_BTN_W && mx <= W) return 'right';
+  return null;
+}
+
+let _mouseArrowActive = null; // 'left' | 'right' | null
+
+cv.addEventListener('pointerdown', (e) => {
+  if (state !== 'playing') return;
+  if (e.pointerType === 'touch') return; // タッチはtouchイベントに任せる
+  const side = _getMouseArrowSide(e.clientX, e.clientY);
+  if (!side) return;
+  _mouseArrowActive = side;
+  if (side === 'left')  { keys['ArrowLeft'] = true;  keys['ArrowRight'] = false; }
+  if (side === 'right') { keys['ArrowRight'] = true; keys['ArrowLeft']  = false; }
+  e.preventDefault();
+});
+
+cv.addEventListener('pointermove', (e) => {
+  if (state !== 'playing') return;
+  if (e.pointerType === 'touch') return;
+  if (_mouseArrowActive === null) return;
+  // ドラッグ中は押し続ける（範囲外に出てもキープ）
+  // 反対側にドラッグしたら方向切り替え
+  const side = _getMouseArrowSide(e.clientX, e.clientY);
+  if (side && side !== _mouseArrowActive) {
+    _mouseArrowActive = side;
+    if (side === 'left')  { keys['ArrowLeft'] = true;  keys['ArrowRight'] = false; }
+    if (side === 'right') { keys['ArrowRight'] = true; keys['ArrowLeft']  = false; }
+  }
+});
+
+document.addEventListener('pointerup', (e) => {
+  if (e.pointerType === 'touch') return;
+  if (_mouseArrowActive === null) return;
+  keys['ArrowLeft']  = false;
+  keys['ArrowRight'] = false;
+  _mouseArrowActive  = null;
+});
+
+document.addEventListener('pointercancel', (e) => {
+  if (e.pointerType === 'touch') return;
+  if (_mouseArrowActive === null) return;
+  keys['ArrowLeft']  = false;
+  keys['ArrowRight'] = false;
+  _mouseArrowActive  = null;
+});
 
 // ===========================
 // お祝いオーバーレイ制御
